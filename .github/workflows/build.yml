@@ -10,13 +10,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: gradle/wrapper-validation-action@v1
+      - uses: gradle/wrapper-validation-action@v2
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -27,11 +27,11 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v4.0.0
+        uses: actions/upload-artifact@v4
         with:
           # Artifact name
-          name: ServerWrecker
+          name: SoulFire
           # A file, directory or wildcard pattern that describes what to upload
           path: |
-            build/libs/ServerWrecker-*.jar
-            !build/libs/ServerWrecker-*-unshaded.jar
+            build/libs/SoulFire-*.jar
+            !build/libs/SoulFire-*-unshaded.jar

@@ -1,10 +1,7 @@
 plugins {
-    id("fabric-loom") version "1.4.6"
-    java
+    id("sf.java-conventions")
+    alias(libs.plugins.loom)
 }
-
-group = "net.pistonmaster"
-version = "1.0.0"
 
 repositories {
     maven("https://maven.parchmentmc.org") {
@@ -25,6 +22,15 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
 }
 
+indra {
+    javaVersions {
+        target(17)
+        minimumToolchain(17)
+        strictVersions(true)
+        testWith(17)
+    }
+}
+
 tasks {
     processResources {
         inputs.property("version", project.version)
@@ -33,11 +39,4 @@ tasks {
             expand(mutableMapOf("version" to project.version))
         }
     }
-}
-
-java {
-    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-    // if it is present.
-    // If you remove this line, sources will not be generated.
-    withSourcesJar()
 }

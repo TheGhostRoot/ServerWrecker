@@ -11,8 +11,8 @@ pluginManagement {
 }
 
 plugins {
-    id("com.gradle.enterprise") version "3.16.1"
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.7.0"
+    id("com.gradle.enterprise") version "3.16.2"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
 @Suppress("UnstableApiUsage")
@@ -60,7 +60,11 @@ gradleEnterprise {
     }
 }
 
-include("data-generator")
-include("build-data", "j8-launcher")
+include(
+    "data-generator",
+    "build-data",
+    "j8-launcher",
+    "proto"
+)
 
-rootProject.name = "serverwrecker"
+rootProject.name = "soulfire"

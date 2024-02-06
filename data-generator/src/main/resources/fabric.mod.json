@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "serverwrecker-data-generator",
+  "id": "soulfire-data-generator",
   "version": "${version}",
-  "name": "ServerWrecker Data Generator",
+  "name": "SoulFire Data Generator",
   "description": "",
   "authors": [
     "Archengius",
@@ -13,11 +13,11 @@
   "environment": "server",
   "entrypoints": {
     "main": [
-      "net.pistonmaster.serverwrecker.generator.Main"
+      "net.pistonmaster.soulfire.generator.Main"
     ]
   },
   "mixins": [
-    "serverwrecker-data-generator.mixins.json"
+    "soulfire-data-generator.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.14.4",
