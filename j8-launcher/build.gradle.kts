@@ -1,13 +1,14 @@
 plugins {
-    java
+  idea
+  java
 }
 
 dependencies {
-    implementation(libs.flatlaf)
+  implementation(libs.flatlaf)
 }
 
 java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(8))
-    }
+  toolchain {
+    languageVersion.set(JavaLanguageVersion.of(8))
+  }
 }

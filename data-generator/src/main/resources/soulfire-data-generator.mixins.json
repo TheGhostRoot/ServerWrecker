@@ -1,12 +1,13 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "net.pistonmaster.soulfire.generator.mixin",
+  "package": "com.soulfiremc.generator.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "BlockAccessor",
     "BlockSettingsOffsetMixin",
     "EULAMixin",
+    "FeatureFlagSetMixin",
     "ReadyMixin"
   ],
   "client": [

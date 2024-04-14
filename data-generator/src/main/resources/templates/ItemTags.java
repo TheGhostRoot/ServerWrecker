@@ -15,9 +15,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package net.pistonmaster.soulfire.data;
+package com.soulfiremc.data;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @SuppressWarnings("unused")
 public class ItemTags {
-    // VALUES REPLACE
+  public static final List<ResourceKey> TAGS = new ArrayList<>();
+
+  //@formatter:off
+  // VALUES REPLACE
+  //@formatter:on
+
+  private ItemTags() {}
+
+  public static ResourceKey register(String key) {
+    var resourceKey = ResourceKey.fromString(key);
+    TAGS.add(resourceKey);
+    return resourceKey;
+  }
 }
