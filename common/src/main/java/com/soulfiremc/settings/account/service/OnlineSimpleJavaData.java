@@ -15,10 +15,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.pathfinding;
+package com.soulfiremc.settings.account.service;
 
-public class MovementConstants {
-  public static final double STEP_HEIGHT = 0.6;
+import com.soulfiremc.grpc.generated.MinecraftAccountProto;
 
-  private MovementConstants() {}
+public record OnlineSimpleJavaData(String authToken, long tokenExpireAt) implements AccountData {
+  public static OnlineSimpleJavaData fromProto(MinecraftAccountProto.OnlineSimpleJavaData data) {
+    return new OnlineSimpleJavaData(data.getAuthToken(), data.getTokenExpireAt());
+  }
+
+  public MinecraftAccountProto.OnlineSimpleJavaData toProto() {
+    return MinecraftAccountProto.OnlineSimpleJavaData.newBuilder()
+      .setAuthToken(authToken)
+      .setTokenExpireAt(tokenExpireAt)
+      .build();
+  }
 }

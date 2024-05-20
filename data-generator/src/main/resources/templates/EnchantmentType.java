@@ -17,29 +17,26 @@
  */
 package com.soulfiremc.data;
 
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.With;
+import net.kyori.adventure.key.Key;
 
 @SuppressWarnings("unused")
 @With(value = AccessLevel.PRIVATE)
 public record EnchantmentType(
   int id,
-  ResourceKey key,
+  Key key,
   int minLevel,
   int maxLevel,
-  List<String> incompatible,
-  String category,
-  String rarity,
+  List<Key> incompatible,
+  Key supportedItems,
   boolean tradeable,
   boolean discoverable,
   boolean curse,
   boolean treasureOnly,
-  List<EquipmentSlot> slots) {
-  public static final Object2ReferenceMap<ResourceKey, EnchantmentType> FROM_KEY =
-    new Object2ReferenceOpenHashMap<>();
+  List<EquipmentSlot> slots) implements RegistryValue<EnchantmentType> {
+  public static final Registry<EnchantmentType> REGISTRY = new Registry<>(RegistryKeys.ENCHANTMENT);
 
   //@formatter:off
   // VALUES REPLACE
@@ -49,12 +46,7 @@ public record EnchantmentType(
     var instance =
       GsonDataHelper.fromJson("/minecraft/enchantments.json", key, EnchantmentType.class);
 
-    FROM_KEY.put(instance.key(), instance);
-    return instance;
-  }
-
-  public static EnchantmentType getByKey(ResourceKey key) {
-    return FROM_KEY.get(key);
+    return REGISTRY.register(instance);
   }
 
   @Override

@@ -86,7 +86,7 @@ public class ItemPlaceHelper {
 
       var optionalBlockType = dataManager.currentLevel().getBlockState(blockPosition).blockType();
       if (optionalBlockType == BlockType.VOID_AIR) {
-        throw new IllegalStateException("Block at " + blockPosition + " is not in view range");
+        throw new IllegalStateException("Block at %s is not in view range".formatted(blockPosition));
       }
 
       var cost =
@@ -113,7 +113,7 @@ public class ItemPlaceHelper {
     var finalBestItemStack = bestItemStack;
     return placeInHand(inventoryManager, playerInventory,
       playerInventory.findMatchingSlotForAction(
-          slot -> slot.item() != null && slot.item().equalsShape(finalBestItemStack))
+          slot -> slot.item() != null && slot.item().canStackWith(finalBestItemStack))
         .orElseThrow(() -> new IllegalStateException("Failed to find item stack to use")));
   }
 

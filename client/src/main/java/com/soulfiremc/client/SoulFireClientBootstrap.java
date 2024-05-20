@@ -24,8 +24,11 @@ import com.soulfiremc.client.gui.popups.ServerSelectDialog;
 import com.soulfiremc.launcher.SoulFireAbstractBootstrap;
 import com.soulfiremc.server.SoulFireServer;
 import com.soulfiremc.server.grpc.DefaultAuthSystem;
+import com.soulfiremc.util.PortHelper;
+import com.soulfiremc.util.SFPathConstants;
 import com.soulfiremc.util.ServerAddress;
 import java.awt.GraphicsEnvironment;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -58,11 +61,11 @@ public class SoulFireClientBootstrap extends SoulFireAbstractBootstrap {
 
         if (runHeadless) {
           log.info("Starting CLI");
-          var cliManager = new CLIManager(rpcClient, PLUGIN_MANAGER);
+          var cliManager = new CLIManager(rpcClient, pluginManager);
           cliManager.initCLI(args);
         } else {
           log.info("Starting GUI");
-          var guiManager = new GUIManager(rpcClient, PLUGIN_MANAGER);
+          var guiManager = new GUIManager(rpcClient, pluginManager);
           guiManager.initGUI();
         }
       };
@@ -73,28 +76,27 @@ public class SoulFireClientBootstrap extends SoulFireAbstractBootstrap {
 
         log.info("Starting integrated server on {}:{}", host, port);
         var soulFire =
-          new SoulFireServer(host, port, PLUGIN_MANAGER, START_TIME, new DefaultAuthSystem());
+          new SoulFireServer(host, port, pluginManager, START_TIME, new DefaultAuthSystem(), getBaseDirectory());
 
         var jwtToken = soulFire.generateIntegratedUserJWT();
         remoteServerConsumer.accept(
           new RemoteServerData(ServerAddress.fromStringAndPort(host, port), jwtToken));
       };
     if (runHeadless) {
-      var host = System.getProperty("sf.remoteHost");
-      if (host == null) {
+      var address = System.getProperty("sf.remoteAddress");
+      if (address == null) {
         runIntegratedServer.run();
       } else {
-        var port = Integer.getInteger("sf.remotePort");
         var token = System.getProperty("sf.remoteToken");
 
-        Objects.requireNonNull(host, "Remote host must be set");
-        Objects.requireNonNull(port, "Remote port must be set");
+        Objects.requireNonNull(address, "Remote address must be set");
         Objects.requireNonNull(token, "Remote token must be set");
 
-        log.info("Using remote server on {}:{}", host, port);
+        log.info("Using remote server on {}", address);
 
         remoteServerConsumer.accept(
-          new RemoteServerData(ServerAddress.fromStringAndPort(host, port), token));
+          new RemoteServerData(ServerAddress.fromStringDefaultPort(
+            address, PortHelper.SF_DEFAULT_PORT), token));
       }
     } else {
       GUIManager.loadGUIProperties();
@@ -107,5 +109,10 @@ public class SoulFireClientBootstrap extends SoulFireAbstractBootstrap {
           () -> new ServerSelectDialog(runIntegratedServer, remoteServerConsumer));
       }
     }
+  }
+
+  @Override
+  protected Path getBaseDirectory() {
+    return SFPathConstants.INTEGRATED_SERVER_DIRECTORY;
   }
 }

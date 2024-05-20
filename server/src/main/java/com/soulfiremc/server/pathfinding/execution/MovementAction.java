@@ -17,19 +17,19 @@
  */
 package com.soulfiremc.server.pathfinding.execution;
 
-import com.github.steveice10.mc.protocol.data.game.entity.RotationOrigin;
 import com.soulfiremc.server.pathfinding.BotEntityState;
-import com.soulfiremc.server.pathfinding.MovementConstants;
 import com.soulfiremc.server.pathfinding.SFVec3i;
 import com.soulfiremc.server.protocol.BotConnection;
 import com.soulfiremc.server.util.MathHelper;
 import com.soulfiremc.server.util.VectorHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.RotationOrigin;
 
 @Slf4j
 @RequiredArgsConstructor
 public final class MovementAction implements WorldAction {
+  private static final double STEP_HEIGHT = 0.6;
   private final SFVec3i blockPosition;
   // Corner jumps normally require you to stand closer to the block to jump
   private final boolean walkFewTicksNoJump;
@@ -52,6 +52,11 @@ public final class MovementAction implements WorldAction {
       var halfDiagonal = clientEntity.boundingBox().diagonalXZLength() / 2;
       return botPosition.distance(targetMiddleBlock) < halfDiagonal;
     }
+  }
+
+  @Override
+  public SFVec3i targetPosition(BotConnection connection) {
+    return blockPosition;
   }
 
   @Override
@@ -83,7 +88,7 @@ public final class MovementAction implements WorldAction {
     clientEntity.controlState().forward(true);
 
     var botPosition = clientEntity.pos();
-    if (targetMiddleBlock.getY() - MovementConstants.STEP_HEIGHT > botPosition.getY()
+    if (targetMiddleBlock.getY() - STEP_HEIGHT > botPosition.getY()
       && shouldJump()) {
       clientEntity.controlState().jumping(true);
     }

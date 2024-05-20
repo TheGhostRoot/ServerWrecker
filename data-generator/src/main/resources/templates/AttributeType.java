@@ -17,16 +17,14 @@
  */
 package com.soulfiremc.data;
 
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import lombok.AccessLevel;
 import lombok.With;
+import net.kyori.adventure.key.Key;
 
 @SuppressWarnings("unused")
 @With(value = AccessLevel.PRIVATE)
-public record AttributeType(int id, ResourceKey key, double min, double max, double defaultValue) {
-  public static final Object2ReferenceMap<ResourceKey, AttributeType> FROM_KEY =
-    new Object2ReferenceOpenHashMap<>();
+public record AttributeType(int id, Key key, double min, double max, double defaultValue) implements RegistryValue<AttributeType> {
+  public static final Registry<AttributeType> REGISTRY = new Registry<>(RegistryKeys.ATTRIBUTE);
 
   //@formatter:off
   // VALUES REPLACE
@@ -36,12 +34,7 @@ public record AttributeType(int id, ResourceKey key, double min, double max, dou
     var instance =
       GsonDataHelper.fromJson("/minecraft/attributes.json", key, AttributeType.class);
 
-    FROM_KEY.put(instance.key(), instance);
-    return instance;
-  }
-
-  public static AttributeType getByKey(ResourceKey key) {
-    return FROM_KEY.get(key);
+    return REGISTRY.register(instance);
   }
 
   @Override

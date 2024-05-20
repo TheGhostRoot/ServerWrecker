@@ -17,15 +17,6 @@
  */
 package com.soulfiremc.server.protocol.netty;
 
-import com.github.steveice10.mc.protocol.codec.MinecraftCodecHelper;
-import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundDelimiterPacket;
-import com.github.steveice10.packetlib.BuiltinFlags;
-import com.github.steveice10.packetlib.codec.PacketCodecHelper;
-import com.github.steveice10.packetlib.crypt.PacketEncryption;
-import com.github.steveice10.packetlib.event.session.PacketSendingEvent;
-import com.github.steveice10.packetlib.packet.Packet;
-import com.github.steveice10.packetlib.packet.PacketProtocol;
-import com.github.steveice10.packetlib.tcp.TcpSession;
 import com.soulfiremc.server.protocol.BotConnection;
 import com.soulfiremc.server.protocol.SFProtocolConstants;
 import com.soulfiremc.server.viaversion.FrameCodec;
@@ -70,6 +61,16 @@ import net.raphimc.vialoader.netty.viabedrock.DisconnectHandler;
 import net.raphimc.vialoader.netty.viabedrock.RakMessageEncapsulationCodec;
 import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
 import org.cloudburstmc.netty.channel.raknet.config.RakChannelOption;
+import org.geysermc.mcprotocollib.network.BuiltinFlags;
+import org.geysermc.mcprotocollib.network.codec.PacketCodecHelper;
+import org.geysermc.mcprotocollib.network.crypt.PacketEncryption;
+import org.geysermc.mcprotocollib.network.event.session.PacketSendingEvent;
+import org.geysermc.mcprotocollib.network.packet.Packet;
+import org.geysermc.mcprotocollib.network.packet.PacketProtocol;
+import org.geysermc.mcprotocollib.network.tcp.TcpSession;
+import org.geysermc.mcprotocollib.protocol.codec.MinecraftCodecHelper;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundDelimiterPacket;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 public class ViaClientSession extends TcpSession {
@@ -155,9 +156,9 @@ public class ViaClientSession extends TcpSession {
       bootstrap.handler(
         new ChannelInitializer<>() {
           @Override
-          public void initChannel(Channel channel) {
+          public void initChannel(@NotNull Channel channel) {
             var protocol = getPacketProtocol();
-            protocol.newClientSession(ViaClientSession.this);
+            protocol.newClientSession(ViaClientSession.this, false);
 
             var pipeline = channel.pipeline();
 
@@ -281,13 +282,13 @@ public class ViaClientSession extends TcpSession {
   }
 
   private void addHAProxySupport(ChannelPipeline pipeline) {
-    InetSocketAddress clientAddress = getFlag(BuiltinFlags.CLIENT_PROXIED_ADDRESS);
+    var clientAddress = getFlag(BuiltinFlags.CLIENT_PROXIED_ADDRESS);
     if (getFlag(BuiltinFlags.ENABLE_CLIENT_PROXY_PROTOCOL, false) && clientAddress != null) {
       pipeline.addFirst(
         "proxy-protocol-packet-sender",
         new ChannelInboundHandlerAdapter() {
           @Override
-          public void channelActive(ChannelHandlerContext ctx) throws Exception {
+          public void channelActive(@NotNull ChannelHandlerContext ctx) throws Exception {
             var proxiedProtocol =
               clientAddress.getAddress() instanceof Inet4Address
                 ? HAProxyProxiedProtocol.TCP4

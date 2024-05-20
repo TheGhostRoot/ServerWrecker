@@ -19,13 +19,13 @@ package com.soulfiremc.server.account;
 
 import com.soulfiremc.settings.account.AuthType;
 import com.soulfiremc.settings.account.MinecraftAccount;
-import com.soulfiremc.settings.account.service.OnlineJavaData;
+import com.soulfiremc.settings.account.service.OnlineSimpleJavaData;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.soulfiremc.util.GsonInstance;
 import com.soulfiremc.util.ReactorHttpHelper;
-import java.io.IOException;
 import java.net.URI;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
@@ -38,7 +38,7 @@ public final class SFEasyMCAuthService
     URI.create("https://api.easymc.io/v1/token/redeem");
 
   @Override
-  public MinecraftAccount login(EasyMCAuthData data, SFProxy proxyData) throws IOException {
+  public CompletableFuture<MinecraftAccount> login(EasyMCAuthData data, SFProxy proxyData) {
     var request = new AuthenticationRequest(data.altToken);
     return ReactorHttpHelper.createReactorClient(proxyData, true)
       .post()
@@ -48,29 +48,29 @@ public final class SFEasyMCAuthService
         (res, content) ->
           content
             .asString()
-            .map(
-              responseText -> {
-                var response =
-                  GsonInstance.GSON.fromJson(responseText, TokenRedeemResponse.class);
+            .<MinecraftAccount>handle((responseText, sink) -> {
+              var response =
+                GsonInstance.GSON.fromJson(responseText, TokenRedeemResponse.class);
 
-                if (response.error() != null) {
-                  log.error("EasyMC has returned a error: {}", response.error());
-                  throw new RuntimeException(response.error());
-                }
+              if (response.error() != null) {
+                log.error("EasyMC has returned a error: {}", response.error());
+                sink.error(new RuntimeException(response.error()));
+                return;
+              }
 
-                if (response.message() != null) {
-                  log.info(
-                    "EasyMC has a message for you (This is not a error): {}",
-                    response.message());
-                }
+              if (response.message() != null) {
+                log.info(
+                  "EasyMC has a message for you (This is not a error): {}",
+                  response.message());
+              }
 
-                return new MinecraftAccount(
-                  AuthType.EASY_MC,
-                  UUID.fromString(response.uuid()),
-                  response.mcName(),
-                  new OnlineJavaData(response.session(), -1));
-              }))
-      .block();
+              sink.next(new MinecraftAccount(
+                AuthType.EASY_MC,
+                UUID.fromString(response.uuid()),
+                response.mcName(),
+                new OnlineSimpleJavaData(response.session(), -1)));
+            }))
+      .toFuture();
   }
 
   @Override
@@ -82,6 +82,12 @@ public final class SFEasyMCAuthService
     }
 
     return new EasyMCAuthData(split[0].trim());
+  }
+
+  @Override
+  public CompletableFuture<MinecraftAccount> refresh(MinecraftAccount account, SFProxy proxyData) {
+    // TODO: Figure out EasyMC refreshing
+    return CompletableFuture.completedFuture(account);
   }
 
   public record EasyMCAuthData(String altToken) {}

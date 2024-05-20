@@ -18,24 +18,34 @@
 package com.soulfiremc.server.util;
 
 import com.soulfiremc.server.data.BlockItems;
+import com.soulfiremc.server.data.EffectType;
 import com.soulfiremc.server.data.ItemType;
+import com.soulfiremc.server.protocol.bot.container.SFItemStack;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
 
 public class ItemTypeHelper {
   private ItemTypeHelper() {}
 
   public static boolean isSafeFullBlockItem(ItemType type) {
-    return BlockItems.getBlockType(type).isPresent() && !isUnsafeToPlace(type);
+    var blockType = BlockItems.getBlockType(type);
+    return blockType.isPresent() && !blockType.get().fallingBlock();
   }
 
-  public static boolean isTool(ItemType type) {
-    return type.tierType() != null || type == ItemType.SHEARS;
+  public static boolean isTool(SFItemStack itemStack) {
+    return itemStack.components().getOptional(DataComponentType.TOOL).isPresent();
   }
 
-  public static boolean isUnsafeToPlace(ItemType type) {
-    return type == ItemType.SAND || type == ItemType.GRAVEL;
-  }
+  public static boolean isGoodEdibleFood(SFItemStack itemStack) {
+    var components = itemStack.components();
+    return components.getOptional(DataComponentType.FOOD).map(f -> {
+      for (var effect : f.getEffects()) {
+        if (EffectType.REGISTRY.getById(effect.getEffect().getEffect().ordinal()).category()
+          == EffectType.EffectCategory.HARMFUL) {
+          return false;
+        }
+      }
 
-  public static boolean isGoodEdibleFood(ItemType type) {
-    return type.foodProperties() != null && !type.foodProperties().possiblyHarmful();
+      return true;
+    }).orElse(false);
   }
 }

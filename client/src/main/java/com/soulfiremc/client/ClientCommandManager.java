@@ -17,26 +17,22 @@
  */
 package com.soulfiremc.client;
 
-import static com.soulfiremc.brigadier.BrigadierHelper.help;
-import static com.soulfiremc.brigadier.BrigadierHelper.literal;
+import static com.soulfiremc.brigadier.ClientBrigadierHelper.help;
+import static com.soulfiremc.brigadier.ClientBrigadierHelper.literal;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.soulfiremc.brigadier.ClientConsoleCommandSource;
 import com.soulfiremc.brigadier.CommandSource;
-import com.soulfiremc.brigadier.LocalConsole;
 import com.soulfiremc.brigadier.PlatformCommandManager;
 import com.soulfiremc.client.grpc.RPCClient;
 import com.soulfiremc.client.settings.ClientSettingsManager;
 import com.soulfiremc.grpc.generated.AttackStartResponse;
 import com.soulfiremc.grpc.generated.CommandCompletionRequest;
-import com.soulfiremc.grpc.generated.CommandHistoryRequest;
 import com.soulfiremc.grpc.generated.CommandRequest;
 import io.grpc.stub.StreamObserver;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import lombok.Getter;
@@ -45,7 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RequiredArgsConstructor(onConstructor_ = @Inject)
-public class ClientCommandManager implements PlatformCommandManager {
+public class ClientCommandManager implements PlatformCommandManager<CommandSource> {
   @Getter
   private final CommandDispatcher<CommandSource> dispatcher = new CommandDispatcher<>();
   private final RPCClient rpcClient;
@@ -88,7 +84,7 @@ public class ClientCommandManager implements PlatformCommandManager {
     try {
       if (isClientCommand(command)) {
         log.debug("Executing command {} on client", command);
-        return dispatcher.execute(command, new LocalConsole());
+        return dispatcher.execute(command, new ClientConsoleCommandSource());
       } else {
         log.debug("Executing command {} on server", command);
         return rpcClient
@@ -119,19 +115,5 @@ public class ClientCommandManager implements PlatformCommandManager {
       log.error("An error occurred while trying to perform tab completion.", e);
       return List.of();
     }
-  }
-
-  @Override
-  public List<Map.Entry<Instant, String>> getCommandHistory() {
-    var history = new ArrayList<Map.Entry<Instant, String>>();
-    for (var entry :
-      rpcClient
-        .commandStubBlocking()
-        .getCommandHistory(CommandHistoryRequest.newBuilder().build())
-        .getEntriesList()) {
-      history.add(Map.entry(Instant.ofEpochSecond(entry.getTimestamp()), entry.getCommand()));
-    }
-
-    return history;
   }
 }

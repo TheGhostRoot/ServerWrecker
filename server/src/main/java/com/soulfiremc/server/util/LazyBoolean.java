@@ -15,23 +15,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.settings.account.service;
+package com.soulfiremc.server.util;
 
-import com.soulfiremc.grpc.generated.MinecraftAccountProto;
+import java.util.function.BooleanSupplier;
+import lombok.RequiredArgsConstructor;
 
-public record OnlineJavaData(String authToken, long tokenExpireAt) implements AccountData {
-  public static OnlineJavaData fromProto(MinecraftAccountProto.OnlineJavaData data) {
-    return new OnlineJavaData(data.getAuthToken(), data.getTokenExpireAt());
-  }
+@RequiredArgsConstructor
+public class LazyBoolean {
+  private final BooleanSupplier supplier;
+  private boolean value;
+  private boolean initialized;
 
-  public boolean isTokenExpired() {
-    return tokenExpireAt != -1 && System.currentTimeMillis() > tokenExpireAt;
-  }
+  public boolean get() {
+    if (!initialized) {
+      value = supplier.getAsBoolean();
+      initialized = true;
+    }
 
-  public MinecraftAccountProto.OnlineJavaData toProto() {
-    return MinecraftAccountProto.OnlineJavaData.newBuilder()
-      .setAuthToken(authToken)
-      .setTokenExpireAt(tokenExpireAt)
-      .build();
+    return value;
   }
 }

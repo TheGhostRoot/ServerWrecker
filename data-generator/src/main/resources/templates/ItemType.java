@@ -17,21 +17,14 @@
  */
 package com.soulfiremc.data;
 
-import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
-import java.util.List;
+import net.kyori.adventure.key.Key;
 
 @SuppressWarnings("unused")
 public record ItemType(
   int id,
-  ResourceKey key,
-  int stackSize,
-  DepletionData depletionData,
-  FoodProperties foodProperties,
-  EquipmentSlot attributeSlot,
-  List<Attribute> attributes,
-  TierType tierType) {
-  public static final Int2ReferenceMap<ItemType> FROM_ID = new Int2ReferenceOpenHashMap<>();
+  Key key,
+  JsonDataComponents components) implements RegistryValue<ItemType> {
+  public static final Registry<ItemType> REGISTRY = new Registry<>(RegistryKeys.ITEM);
 
   //@formatter:off
   // VALUES REPLACE
@@ -41,12 +34,7 @@ public record ItemType(
     var instance =
       GsonDataHelper.fromJson("/minecraft/items.json", key, ItemType.class);
 
-    FROM_ID.put(instance.id(), instance);
-    return instance;
-  }
-
-  public static ItemType getById(int id) {
-    return FROM_ID.get(id);
+    return REGISTRY.register(instance);
   }
 
   @Override
@@ -64,14 +52,4 @@ public record ItemType(
   public int hashCode() {
     return id;
   }
-
-  public record DepletionData(List<String> repairWith, int maxDamage) {}
-
-  public record FoodProperties(
-    int nutrition,
-    float saturationModifier,
-    boolean fastFood,
-    boolean isMeat,
-    boolean canAlwaysEat,
-    boolean possiblyHarmful) {}
 }

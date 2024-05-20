@@ -17,55 +17,38 @@
  */
 package com.soulfiremc.server.protocol.bot.state;
 
-import com.soulfiremc.server.data.BlockType;
-import com.soulfiremc.server.data.EntityType;
-import com.soulfiremc.server.data.FluidType;
-import com.soulfiremc.server.data.ItemType;
-import com.soulfiremc.server.data.RegistryKeys;
-import com.soulfiremc.server.data.ResourceKey;
+import com.soulfiremc.server.data.RegistryValue;
+import com.soulfiremc.server.data.TagKey;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.Map;
 import lombok.Getter;
+import net.kyori.adventure.key.Key;
 
 @Getter
 public class TagsState {
-  private final Map<ResourceKey, Map<ResourceKey, IntSet>> tags = new Object2ObjectOpenHashMap<>();
+  private final Map<Key, Map<Key, IntSet>> tags = new Object2ObjectOpenHashMap<>();
 
+  @SuppressWarnings("PatternValidation")
   public void handleTagData(Map<String, Map<String, int[]>> updateTags) {
     for (var entry : updateTags.entrySet()) {
-      var tagMap = new Object2ObjectOpenHashMap<ResourceKey, IntSet>();
+      var tagMap = new Object2ObjectOpenHashMap<Key, IntSet>();
       for (var tagEntry : entry.getValue().entrySet()) {
         var set = new IntOpenHashSet(tagEntry.getValue());
-        tagMap.put(ResourceKey.fromString(tagEntry.getKey()), set);
+        tagMap.put(Key.key(tagEntry.getKey()), set);
       }
-      tags.put(ResourceKey.fromString(entry.getKey()), tagMap);
+      tags.put(Key.key(entry.getKey()), tagMap);
     }
   }
 
-  public boolean isBlockInTag(BlockType blockType, ResourceKey tagKey) {
-    return tags.getOrDefault(RegistryKeys.BLOCK, Map.of())
-      .getOrDefault(tagKey, IntSet.of())
-      .contains(blockType.id());
+  public <T extends RegistryValue<T>> boolean isValueInTag(T value, TagKey<T> tagKey) {
+    return getValuesOfTag(value, tagKey).contains(value.id());
   }
 
-  public boolean isItemInTag(ItemType itemType, ResourceKey tagKey) {
-    return tags.getOrDefault(RegistryKeys.ITEM, Map.of())
-      .getOrDefault(tagKey, IntSet.of())
-      .contains(itemType.id());
-  }
-
-  public boolean isEntityInTag(EntityType entityType, ResourceKey tagKey) {
-    return tags.getOrDefault(RegistryKeys.ENTITY_TYPE, Map.of())
-      .getOrDefault(tagKey, IntSet.of())
-      .contains(entityType.id());
-  }
-
-  public boolean isFluidInTag(FluidType fluidType, ResourceKey tagKey) {
-    return tags.getOrDefault(RegistryKeys.FLUID, Map.of())
-      .getOrDefault(tagKey, IntSet.of())
-      .contains(fluidType.id());
+  public <T extends RegistryValue<T>> IntSet getValuesOfTag(T value, TagKey<T> tagKey) {
+    return tags.getOrDefault(tagKey.registry().key(), Map.of())
+      .getOrDefault(tagKey.key(), IntSet.of());
   }
 
   public Map<String, Map<String, int[]>> exportTags() {

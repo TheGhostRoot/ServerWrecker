@@ -28,25 +28,28 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import net.kyori.adventure.key.Key;
 
 public class GsonDataHelper {
   private static final Map<String, JsonArray> LOADED_DATA = new HashMap<>();
+  private static final TypeAdapter<Key> RESOURCE_KEY_ADAPTER =
+    new TypeAdapter<>() {
+      @Override
+      public void write(JsonWriter out, Key value) throws IOException {
+        out.value(value.asString());
+      }
+
+      @Override
+      @SuppressWarnings("PatternValidation")
+      public Key read(JsonReader in) throws IOException {
+        var key = in.nextString();
+        return Key.key(key);
+      }
+    };
   private static final Function<Map<Class<?>, TypeAdapter<?>>, Gson> GSON_FACTORY = (typeAdapters) -> {
     var builder = new GsonBuilder()
-      .registerTypeAdapter(
-        ResourceKey.class,
-        new TypeAdapter<ResourceKey>() {
-          @Override
-          public void write(JsonWriter out, ResourceKey value) throws IOException {
-            out.value(value.toString());
-          }
-
-          @Override
-          public ResourceKey read(JsonReader in) throws IOException {
-            var key = in.nextString();
-            return ResourceKey.fromString(key);
-          }
-        });
+      .registerTypeAdapter(Key.class, RESOURCE_KEY_ADAPTER)
+      .registerTypeAdapter(JsonDataComponents.class, JsonDataComponents.SERIALIZER);
 
     for (var entry : typeAdapters.entrySet()) {
       builder.registerTypeAdapter(entry.getKey(), entry.getValue());
@@ -81,6 +84,6 @@ public class GsonDataHelper {
       }
     }
 
-    throw new RuntimeException("Failed to find data key " + dataKey + " in file " + dataFile);
+    throw new RuntimeException("Failed to find data key %s in file %s".formatted(dataKey, dataFile));
   }
 }

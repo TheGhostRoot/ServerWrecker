@@ -19,6 +19,7 @@ package com.soulfiremc.server.data;
 
 import com.soulfiremc.server.protocol.bot.movement.AABB;
 import java.util.List;
+import net.kyori.adventure.key.Key;
 import org.cloudburstmc.math.vector.Vector3i;
 
 public record BlockState(
@@ -32,16 +33,17 @@ public record BlockState(
     boolean defaultState,
     BlockStateProperties properties,
     BlockType blockType,
+    Key key,
     int stateIndex) {
-    this(id, blockType, defaultState, properties, getBlockShapeGroup(blockType, stateIndex));
+    this(id, blockType, defaultState, properties, getBlockShapeGroup(key, stateIndex));
   }
 
   public static BlockState forDefaultBlockType(BlockType blockType) {
     return blockType.statesData().defaultState();
   }
 
-  private static BlockShapeGroup getBlockShapeGroup(BlockType blockType, int stateIndex) {
-    var shapeGroups = BlockShapeLoader.BLOCK_SHAPES.get(blockType.key());
+  private static BlockShapeGroup getBlockShapeGroup(Key key, int stateIndex) {
+    var shapeGroups = BlockShapeLoader.BLOCK_SHAPES.get(key);
     var size = shapeGroups.size();
     if (size == 0) {
       // This block has no shape stored, this is for example for air or grass

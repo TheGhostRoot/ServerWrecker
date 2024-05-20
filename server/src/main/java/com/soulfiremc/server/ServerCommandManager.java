@@ -18,13 +18,12 @@
 package com.soulfiremc.server;
 
 import static com.mojang.brigadier.CommandDispatcher.ARGUMENT_SEPARATOR;
-import static com.soulfiremc.brigadier.BrigadierHelper.argument;
-import static com.soulfiremc.brigadier.BrigadierHelper.help;
-import static com.soulfiremc.brigadier.BrigadierHelper.helpRedirect;
-import static com.soulfiremc.brigadier.BrigadierHelper.literal;
-import static com.soulfiremc.brigadier.BrigadierHelper.privateCommand;
+import static com.soulfiremc.server.brigadier.ServerBrigadierHelper.argument;
+import static com.soulfiremc.server.brigadier.ServerBrigadierHelper.help;
+import static com.soulfiremc.server.brigadier.ServerBrigadierHelper.helpRedirect;
+import static com.soulfiremc.server.brigadier.ServerBrigadierHelper.literal;
+import static com.soulfiremc.server.brigadier.ServerBrigadierHelper.privateCommand;
 
-import com.github.steveice10.mc.protocol.data.game.entity.RotationOrigin;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
@@ -35,7 +34,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestion;
 import com.mojang.brigadier.tree.CommandNode;
 import com.soulfiremc.brigadier.CommandHelpWrapper;
-import com.soulfiremc.brigadier.CommandSource;
 import com.soulfiremc.brigadier.PlatformCommandManager;
 import com.soulfiremc.brigadier.RedirectHelpWrapper;
 import com.soulfiremc.server.api.SoulFireAPI;
@@ -56,6 +54,9 @@ import com.soulfiremc.server.pathfinding.goals.PosGoal;
 import com.soulfiremc.server.pathfinding.goals.XZGoal;
 import com.soulfiremc.server.pathfinding.goals.YGoal;
 import com.soulfiremc.server.protocol.BotConnection;
+import com.soulfiremc.server.spark.SFSparkCommandSender;
+import com.soulfiremc.server.spark.SFSparkPlugin;
+import com.soulfiremc.server.user.ServerCommandSource;
 import com.soulfiremc.server.util.PrimitiveHelper;
 import com.soulfiremc.server.util.UUIDHelper;
 import com.soulfiremc.server.viaversion.SFVersionConstants;
@@ -64,8 +65,6 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -81,19 +80,17 @@ import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import net.raphimc.vialoader.util.ProtocolVersionList;
 import org.apache.commons.io.FileUtils;
 import org.cloudburstmc.math.vector.Vector3d;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.RotationOrigin;
 
-@Slf4j
 @RequiredArgsConstructor(onConstructor_ = @Inject)
-public class ServerCommandManager implements PlatformCommandManager {
+public class ServerCommandManager implements PlatformCommandManager<ServerCommandSource> {
   private static final ThreadLocal<Map<String, String>> COMMAND_CONTEXT =
     ThreadLocal.withInitial(Object2ObjectOpenHashMap::new);
-  private static final Path HISTORY_FILE = SFPathConstants.DATA_FOLDER.resolve(".command_history");
   @Getter
-  private final CommandDispatcher<CommandSource> dispatcher = new CommandDispatcher<>();
+  private final CommandDispatcher<ServerCommandSource> dispatcher = new CommandDispatcher<>();
   private final SoulFireServer soulFireServer;
   private final List<Map.Entry<Instant, String>> commandHistory =
     Collections.synchronizedList(new ArrayList<>());
@@ -110,8 +107,6 @@ public class ServerCommandManager implements PlatformCommandManager {
 
   @PostConstruct
   public void postConstruct() {
-    loadCommandHistory();
-
     // Help
     dispatcher.register(
       literal("help")
@@ -122,18 +117,6 @@ public class ServerCommandManager implements PlatformCommandManager {
               c.getSource().sendInfo("Available commands:");
               for (var command : getAllUsage(dispatcher.getRoot(), c.getSource())) {
                 c.getSource().sendInfo("{} -> {}", command.command(), command.help());
-              }
-
-              return Command.SINGLE_SUCCESS;
-            })));
-    dispatcher.register(
-      literal("help-markdown")
-        .executes(
-          privateCommand(
-            c -> {
-              for (var command : getAllUsage(dispatcher.getRoot(), c.getSource())) {
-                c.getSource()
-                  .sendInfo("| `%s` | %s |".formatted(command.command(), command.help()));
               }
 
               return Command.SINGLE_SUCCESS;
@@ -160,28 +143,6 @@ public class ServerCommandManager implements PlatformCommandManager {
             "See who you are",
             c -> {
               c.getSource().sendInfo("Username: {}", getCurrentUsername());
-
-              return Command.SINGLE_SUCCESS;
-            })));
-
-    // History commands
-    dispatcher.register(
-      literal("reload-history")
-        .executes(
-          help(
-            "Refreshes the loaded command history from the data file",
-            c -> {
-              loadCommandHistory();
-
-              return Command.SINGLE_SUCCESS;
-            })));
-    dispatcher.register(
-      literal("clear-history")
-        .executes(
-          help(
-            "Wipes the command history data",
-            c -> {
-              clearCommandHistory();
 
               return Command.SINGLE_SUCCESS;
             })));
@@ -254,10 +215,10 @@ public class ServerCommandManager implements PlatformCommandManager {
                         }))))));
     dispatcher.register(
       literal("collect")
-        .then(argument("block", new TagBasedArgumentType<BlockTagResolvable>(
+        .then(argument("block", new TagBasedArgumentType<BlockType, BlockTagResolvable>(
           key -> tags -> block -> block.key().equals(key),
-          key -> tags -> block -> tags.isBlockInTag(block, key),
-          BlockType.FROM_KEY.keySet().stream().toList(),
+          key -> tags -> block -> tags.isValueInTag(block, key),
+          BlockType.REGISTRY.values().stream().map(BlockType::key).toList(),
           BlockTags.TAGS
         ))
           .then(argument("amount", IntegerArgumentType.integer(1))
@@ -511,6 +472,27 @@ public class ServerCommandManager implements PlatformCommandManager {
                   return Command.SINGLE_SUCCESS;
                 }))));
 
+    // Spark
+    dispatcher.register(
+      literal("spark")
+        .then(argument("command", StringArgumentType.greedyString())
+          .executes(
+            help(
+              "Runs a spark subcommand",
+              c -> {
+                var command = StringArgumentType.getString(c, "command");
+                SFSparkPlugin.INSTANCE.platform()
+                  .executeCommand(new SFSparkCommandSender(c.getSource()), command.split(ARGUMENT_SEPARATOR));
+                return Command.SINGLE_SUCCESS;
+              })))
+        .executes(
+          help(
+            "Get spark help",
+            c -> {
+              SFSparkPlugin.INSTANCE.platform().executeCommand(new SFSparkCommandSender(c.getSource()), new String[] {});
+              return Command.SINGLE_SUCCESS;
+            })));
+
     // Utility commands
     dispatcher.register(
       literal("online")
@@ -635,8 +617,7 @@ public class ServerCommandManager implements PlatformCommandManager {
     dispatcher.register(
       literal("generate-versions")
         .executes(
-          help(
-            "Create a table of all supported protocol versions",
+          privateCommand(
             c -> {
               var yesEmoji = "✅";
               var noEmoji = "❌";
@@ -645,6 +626,7 @@ public class ServerCommandManager implements PlatformCommandManager {
               ProtocolVersionList.getProtocolsNewToOld()
                 .forEach(
                   version -> {
+                    var versionId = "%s\\|%d".formatted(version.getVersionType().name(), version.getOriginalVersion());
                     var nativeVersion =
                       SFVersionConstants.CURRENT_PROTOCOL_VERSION == version
                         ? yesEmoji
@@ -659,10 +641,23 @@ public class ServerCommandManager implements PlatformCommandManager {
                       SFVersionConstants.isLegacy(version) ? yesEmoji : noEmoji;
 
                     builder.append(
-                      "| %s | %s | %s | %s | %s | %s |\n".formatted(version.getName(), nativeVersion, javaVersion,
+                      "| `%s` | `%s` | %s | %s | %s | %s | %s |\n".formatted(version.getName(), versionId, nativeVersion, javaVersion,
                         snapshotVersion, legacyVersion, bedrockVersion));
                   });
-              log.info(builder.toString());
+              c.getSource().sendInfo(builder.toString());
+
+              return Command.SINGLE_SUCCESS;
+            })));
+    dispatcher.register(
+      literal("generate-commands")
+        .executes(
+          privateCommand(
+            c -> {
+              var builder = new StringBuilder("\n");
+              for (var command : getAllUsage(dispatcher.getRoot(), c.getSource())) {
+                builder.append("| `%s` | %s |\n".formatted(command.command(), command.help()));
+              }
+              c.getSource().sendInfo(builder.toString());
 
               return Command.SINGLE_SUCCESS;
             })));
@@ -725,7 +720,7 @@ public class ServerCommandManager implements PlatformCommandManager {
   }
 
   private int exportMap(
-    CommandContext<CommandSource> context, Function<BotConnection, IntSet> idProvider) {
+    CommandContext<ServerCommandSource> context, Function<BotConnection, IntSet> idProvider) {
     // Inside here to capture a time for the file name
     var currentTime = System.currentTimeMillis();
     return forEveryBot(
@@ -741,8 +736,9 @@ public class ServerCommandManager implements PlatformCommandManager {
           var image = mapDataState.toBufferedImage();
           var fileName = "map_%d_%d_%s.png".formatted(currentTime, mapId, bot.accountName());
           try {
-            Files.createDirectories(SFPathConstants.MAPS_FOLDER);
-            var file = SFPathConstants.MAPS_FOLDER.resolve(fileName);
+            var mapsDirectory = SFPathConstants.getMapsDirectory(soulFireServer.baseDirectory());
+            Files.createDirectories(mapsDirectory);
+            var file = mapsDirectory.resolve(fileName);
             ImageIO.write(image, "png", file.toFile());
             context.getSource().sendInfo("Exported map to {}", file);
           } catch (IOException e) {
@@ -755,12 +751,12 @@ public class ServerCommandManager implements PlatformCommandManager {
   }
 
   public int forEveryAttack(
-    CommandContext<CommandSource> context, ToIntFunction<AttackManager> consumer) {
+    CommandContext<ServerCommandSource> context, ToIntFunction<AttackManager> consumer) {
     return forEveryAttack(context, consumer, true);
   }
 
   private int forEveryAttack(
-    CommandContext<CommandSource> context,
+    CommandContext<ServerCommandSource> context,
     ToIntFunction<AttackManager> consumer,
     boolean printMessages) {
     if (soulFireServer.attacks().isEmpty()) {
@@ -796,12 +792,12 @@ public class ServerCommandManager implements PlatformCommandManager {
   }
 
   public int forEveryAttackEnsureHasBots(
-    CommandContext<CommandSource> context, ToIntFunction<AttackManager> consumer) {
+    CommandContext<ServerCommandSource> context, ToIntFunction<AttackManager> consumer) {
     return forEveryAttackEnsureHasBots(context, consumer, true);
   }
 
   private int forEveryAttackEnsureHasBots(
-    CommandContext<CommandSource> context,
+    CommandContext<ServerCommandSource> context,
     ToIntFunction<AttackManager> consumer,
     boolean printMessages) {
     return forEveryAttack(
@@ -820,12 +816,12 @@ public class ServerCommandManager implements PlatformCommandManager {
   }
 
   public int forEveryBot(
-    CommandContext<CommandSource> context, ToIntFunction<BotConnection> consumer) {
+    CommandContext<ServerCommandSource> context, ToIntFunction<BotConnection> consumer) {
     return forEveryBot(context, consumer, true);
   }
 
   private int forEveryBot(
-    CommandContext<CommandSource> context,
+    CommandContext<ServerCommandSource> context,
     ToIntFunction<BotConnection> consumer,
     boolean printMessages) {
     return forEveryAttackEnsureHasBots(
@@ -856,7 +852,7 @@ public class ServerCommandManager implements PlatformCommandManager {
       printMessages);
   }
 
-  public int executePathfinding(CommandContext<CommandSource> context,
+  public int executePathfinding(CommandContext<ServerCommandSource> context,
                                 Function<BotConnection, GoalScorer> goalScorerFactory) {
     return forEveryBot(
       context,
@@ -867,86 +863,24 @@ public class ServerCommandManager implements PlatformCommandManager {
   }
 
   @Override
-  public List<Map.Entry<Instant, String>> getCommandHistory() {
-    synchronized (commandHistory) {
-      return List.copyOf(commandHistory);
-    }
-  }
-
-  @Override
-  public int execute(String command, CommandSource source) {
+  public int execute(String command, ServerCommandSource source) {
     command = command.strip();
 
     try {
       var result = dispatcher.execute(command, source);
       commandHistory.add(Map.entry(Instant.now(), command));
 
-      // Only save successful commands
-      if (result == Command.SINGLE_SUCCESS) {
-        newCommandHistoryEntry(command);
-      }
-
       return result;
     } catch (CommandSyntaxException e) {
-      log.warn(e.getMessage());
+      source.sendWarn(e.getMessage());
       return Command.SINGLE_SUCCESS;
     } finally {
       COMMAND_CONTEXT.get().clear();
     }
   }
 
-  private void loadCommandHistory() {
-    synchronized (commandHistory) {
-      commandHistory.clear();
-      try {
-        if (!Files.exists(HISTORY_FILE)) {
-          return;
-        }
-
-        var lines = Files.readAllLines(HISTORY_FILE);
-        for (var line : lines) {
-          var firstColon = line.indexOf(':');
-          if (firstColon == -1) {
-            continue;
-          }
-
-          var seconds = Long.parseLong(line.substring(0, firstColon));
-          var command = line.substring(firstColon + 1);
-
-          commandHistory.add(Map.entry(Instant.ofEpochSecond(seconds), command));
-        }
-      } catch (IOException e) {
-        log.error("Failed to create command history file!", e);
-      }
-    }
-  }
-
-  private void newCommandHistoryEntry(String command) {
-    synchronized (commandHistory) {
-      try {
-        Files.createDirectories(HISTORY_FILE.getParent());
-        var newLine = Instant.now().getEpochSecond() + ":" + command + System.lineSeparator();
-        Files.writeString(
-          HISTORY_FILE, newLine, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-      } catch (IOException e) {
-        log.error("Failed to create command history file!", e);
-      }
-    }
-  }
-
-  private void clearCommandHistory() {
-    synchronized (commandHistory) {
-      try {
-        Files.deleteIfExists(HISTORY_FILE);
-        commandHistory.clear();
-      } catch (IOException e) {
-        log.error("Failed to delete command history file!", e);
-      }
-    }
-  }
-
   @Override
-  public List<String> getCompletionSuggestions(String command, CommandSource source) {
+  public List<String> getCompletionSuggestions(String command, ServerCommandSource source) {
     try {
       return dispatcher
         .getCompletionSuggestions(dispatcher.parse(command, source))
@@ -961,15 +895,15 @@ public class ServerCommandManager implements PlatformCommandManager {
   }
 
   private HelpData[] getAllUsage(
-    final CommandNode<CommandSource> node, final CommandSource source) {
+    final CommandNode<ServerCommandSource> node, final ServerCommandSource source) {
     final var result = new ArrayList<HelpData>();
     getAllUsage(node, source, result, "");
     return result.toArray(new HelpData[0]);
   }
 
   private void getAllUsage(
-    final CommandNode<CommandSource> node,
-    final CommandSource source,
+    final CommandNode<ServerCommandSource> node,
+    final ServerCommandSource source,
     final ArrayList<HelpData> result,
     final String prefix) {
     if (!node.canUse(source)) {
@@ -977,14 +911,14 @@ public class ServerCommandManager implements PlatformCommandManager {
     }
 
     if (node.getCommand() != null) {
-      var helpWrapper = (CommandHelpWrapper) node.getCommand();
+      var helpWrapper = (CommandHelpWrapper<?>) node.getCommand();
       if (!helpWrapper.privateCommand()) {
         result.add(new HelpData(prefix, helpWrapper.help()));
       }
     }
 
     if (node.getRedirect() != null) {
-      var redirectHelpWrapper = (RedirectHelpWrapper) node.getRedirectModifier();
+      var redirectHelpWrapper = (RedirectHelpWrapper<?>) node.getRedirectModifier();
       if (!redirectHelpWrapper.privateCommand()) {
         final var redirect =
           node.getRedirect() == dispatcher.getRoot()

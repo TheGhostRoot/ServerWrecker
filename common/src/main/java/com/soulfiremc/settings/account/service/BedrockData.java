@@ -17,11 +17,16 @@
  */
 package com.soulfiremc.settings.account.service;
 
+import com.google.gson.JsonObject;
+import com.google.protobuf.Struct;
+import com.google.protobuf.util.JsonFormat;
 import com.soulfiremc.grpc.generated.MinecraftAccountProto;
+import com.soulfiremc.util.GsonInstance;
 import com.soulfiremc.util.KeyHelper;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.util.UUID;
+import lombok.SneakyThrows;
 
 public record BedrockData(
   String mojangJwt,
@@ -29,8 +34,10 @@ public record BedrockData(
   ECPublicKey publicKey,
   ECPrivateKey privateKey,
   UUID deviceId,
-  String playFabId)
+  String playFabId,
+  JsonObject authChain)
   implements AccountData {
+  @SneakyThrows
   public static BedrockData fromProto(MinecraftAccountProto.BedrockData data) {
     return new BedrockData(
       data.getMojangJwt(),
@@ -38,10 +45,14 @@ public record BedrockData(
       KeyHelper.decodeBase64PublicKey(data.getPublicKey()),
       KeyHelper.decodeBase64PrivateKey(data.getPrivateKey()),
       UUID.fromString(data.getDeviceId()),
-      data.getPlayFabId());
+      data.getPlayFabId(),
+      GsonInstance.GSON.fromJson(JsonFormat.printer().print(data.getAuthChain()), JsonObject.class));
   }
 
+  @SneakyThrows
   public MinecraftAccountProto.BedrockData toProto() {
+    var authChainBuilder = Struct.newBuilder();
+    JsonFormat.parser().merge(GsonInstance.GSON.toJson(authChain), authChainBuilder);
     return MinecraftAccountProto.BedrockData.newBuilder()
       .setMojangJwt(mojangJwt)
       .setIdentityJwt(identityJwt)
@@ -49,6 +60,7 @@ public record BedrockData(
       .setPrivateKey(KeyHelper.encodeBase64Key(privateKey))
       .setDeviceId(deviceId.toString())
       .setPlayFabId(playFabId)
+      .setAuthChain(authChainBuilder.build())
       .build();
   }
 }

@@ -22,12 +22,14 @@ import com.soulfiremc.grpc.generated.ProxyCheckRequest;
 import com.soulfiremc.grpc.generated.ProxyCheckResponse;
 import com.soulfiremc.grpc.generated.ProxyCheckResponseSingle;
 import com.soulfiremc.grpc.generated.ProxyCheckServiceGrpc;
+import com.soulfiremc.server.user.Permissions;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.soulfiremc.util.ReactorHttpHelper;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import io.netty.handler.codec.http.HttpStatusClass;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
@@ -38,16 +40,19 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 public class ProxyCheckServiceImpl extends ProxyCheckServiceGrpc.ProxyCheckServiceImplBase {
+  private static final URL IPIFY_URL = ReactorHttpHelper.createURL("https://api.ipify.org");
+  private static final URL AWS_URL = ReactorHttpHelper.createURL("https://checkip.amazonaws.com");
+
   @Override
   public void check(
     ProxyCheckRequest request, StreamObserver<ProxyCheckResponse> responseObserver) {
-    ServerRPCConstants.USER_CONTEXT_KEY.get().canAccessOrThrow(Resource.CHECK_PROXY);
+    ServerRPCConstants.USER_CONTEXT_KEY.get().hasPermissionOrThrow(Permissions.CHECK_PROXY);
 
     try {
       var url =
         switch (request.getTarget()) {
-          case IPIFY -> ReactorHttpHelper.createURL("https://api.ipify.org");
-          case AWS -> ReactorHttpHelper.createURL("https://checkip.amazonaws.com");
+          case IPIFY -> IPIFY_URL;
+          case AWS -> AWS_URL;
           case UNRECOGNIZED -> throw new IllegalArgumentException("Unrecognized target");
         };
 

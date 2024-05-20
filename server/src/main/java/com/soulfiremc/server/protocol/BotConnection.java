@@ -17,9 +17,6 @@
  */
 package com.soulfiremc.server.protocol;
 
-import com.github.steveice10.mc.protocol.MinecraftProtocol;
-import com.github.steveice10.mc.protocol.data.ProtocolState;
-import com.github.steveice10.packetlib.packet.Packet;
 import com.soulfiremc.server.AttackManager;
 import com.soulfiremc.server.SoulFireScheduler;
 import com.soulfiremc.server.api.event.EventExceptionHandler;
@@ -35,7 +32,7 @@ import com.soulfiremc.server.protocol.netty.ViaClientSession;
 import com.soulfiremc.server.settings.lib.SettingsHolder;
 import com.soulfiremc.server.util.TimeUtil;
 import com.soulfiremc.settings.account.MinecraftAccount;
-import com.soulfiremc.settings.account.service.OnlineJavaData;
+import com.soulfiremc.settings.account.service.OnlineSimpleJavaData;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import io.netty.channel.EventLoopGroup;
@@ -48,6 +45,9 @@ import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import net.lenni0451.lambdaevents.LambdaManager;
 import net.lenni0451.lambdaevents.generator.ASMGenerator;
+import org.geysermc.mcprotocollib.network.packet.Packet;
+import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
+import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
 import org.slf4j.Logger;
 
 @Getter
@@ -186,7 +186,7 @@ public final class BotConnection {
 
   public void joinServerId(String serverId, ViaClientSession session) {
     try {
-      var javaData = (OnlineJavaData) minecraftAccount.accountData();
+      var javaData = (OnlineSimpleJavaData) minecraftAccount.accountData();
       sessionService.joinServer(accountProfileId, javaData.authToken(), serverId);
       session.logger().debug("Successfully sent mojang join request!");
     } catch (Exception e) {

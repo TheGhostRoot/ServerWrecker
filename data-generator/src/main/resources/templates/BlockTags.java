@@ -19,10 +19,11 @@ package com.soulfiremc.data;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.kyori.adventure.key.KeyPattern;
 
 @SuppressWarnings("unused")
 public class BlockTags {
-  public static final List<ResourceKey> TAGS = new ArrayList<>();
+  public static final List<TagKey<BlockType>> TAGS = new ArrayList<>();
 
   //@formatter:off
   // VALUES REPLACE
@@ -30,9 +31,9 @@ public class BlockTags {
 
   private BlockTags() {}
 
-  public static ResourceKey register(String key) {
-    var resourceKey = ResourceKey.fromString(key);
-    TAGS.add(resourceKey);
+  public static <T extends RegistryValue<T>> TagKey<T> register(@KeyPattern String key, List<TagKey<T>> values) {
+    var resourceKey = TagKey.<T>key(key, RegistryKeys.BLOCK);
+    values.add(resourceKey);
     return resourceKey;
   }
 }

@@ -21,18 +21,24 @@ import com.soulfiremc.api.MixinExtension;
 import com.soulfiremc.builddata.BuildData;
 import com.soulfiremc.util.CustomClassProvider;
 import com.soulfiremc.util.PortHelper;
+import com.soulfiremc.util.SFLogAppender;
 import com.soulfiremc.util.SFPathConstants;
 import io.netty.util.ResourceLeakDetector;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.lenni0451.classtransform.TransformerManager;
 import net.lenni0451.classtransform.mixinstranslator.MixinsTranslator;
 import net.lenni0451.reflect.Agents;
+import net.lenni0451.reflect.Fields;
 import org.fusesource.jansi.AnsiConsole;
 import org.pf4j.JarPluginManager;
 import org.pf4j.PluginManager;
@@ -43,8 +49,6 @@ import org.pf4j.PluginManager;
 @Slf4j
 public abstract class SoulFireAbstractBootstrap {
   public static final Instant START_TIME = Instant.now();
-  public static final PluginManager PLUGIN_MANAGER =
-    new JarPluginManager(SFPathConstants.PLUGINS_FOLDER);
 
   static {
     System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
@@ -61,6 +65,9 @@ public abstract class SoulFireAbstractBootstrap {
       ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
     }
   }
+
+  protected final Path pluginsDirectory = SFPathConstants.getPluginsDirectory(getBaseDirectory());
+  protected final PluginManager pluginManager = new JarPluginManager(pluginsDirectory);
 
   protected SoulFireAbstractBootstrap() {}
 
@@ -87,26 +94,34 @@ public abstract class SoulFireAbstractBootstrap {
       });
   }
 
-  private static void initPlugins(List<ClassLoader> classLoaders) {
+  private void initPlugins(List<ClassLoader> classLoaders) {
     try {
-      Files.createDirectories(SFPathConstants.PLUGINS_FOLDER);
+      Files.createDirectories(pluginsDirectory);
     } catch (IOException e) {
-      log.error("Failed to create plugin directory", e);
+      log.error("Failed to create plugins directory", e);
     }
 
     // Prepare the plugin manager
-    PLUGIN_MANAGER.setSystemVersion(BuildData.VERSION);
+    pluginManager.setSystemVersion(BuildData.VERSION);
 
     // Load all plugins available
-    PLUGIN_MANAGER.loadPlugins();
-    PLUGIN_MANAGER.startPlugins();
+    pluginManager.loadPlugins();
+    pluginManager.startPlugins();
 
-    for (var plugin : PLUGIN_MANAGER.getPlugins()) {
+    for (var plugin : pluginManager.getPlugins()) {
       classLoaders.add(plugin.getPluginClassLoader());
     }
   }
 
+  @SneakyThrows
   protected void internalBootstrap(String[] args, List<ClassLoader> classLoaders) {
+    var forkJoinPoolFactory = new CustomThreadFactory();
+    // Ensure the ForkJoinPool uses our custom thread factory
+    Fields.set(ForkJoinPool.commonPool(), ForkJoinPool.class.getDeclaredField("factory"), forkJoinPoolFactory);
+    Fields.set(null, ForkJoinPool.class.getDeclaredField("defaultForkJoinWorkerThreadFactory"), forkJoinPoolFactory);
+
+    SFLogAppender.INSTANCE.start();
+
     AnsiConsole.systemInstall();
 
     injectExceptionHandler();
@@ -118,7 +133,7 @@ public abstract class SoulFireAbstractBootstrap {
 
   private void injectMixinsAndRun(String[] args) {
     var mixinPaths = new HashSet<String>();
-    PLUGIN_MANAGER
+    pluginManager
       .getExtensions(MixinExtension.class)
       .forEach(
         mixinExtension -> {
@@ -133,7 +148,7 @@ public abstract class SoulFireAbstractBootstrap {
 
     var classLoaders = new ArrayList<ClassLoader>();
     classLoaders.add(SoulFireAbstractBootstrap.class.getClassLoader());
-    PLUGIN_MANAGER
+    pluginManager
       .getPlugins()
       .forEach(pluginWrapper -> classLoaders.add(pluginWrapper.getPluginClassLoader()));
 
@@ -147,11 +162,28 @@ public abstract class SoulFireAbstractBootstrap {
       log.info("Used Runtime Agent to inject mixins");
 
       this.postMixinMain(args);
-    } catch (ReflectiveOperationException | IOException t) {
+    } catch (IOException t) {
       log.error("Failed to inject mixins", t);
       System.exit(1);
     }
   }
 
   protected abstract void postMixinMain(String[] args);
+
+  protected abstract Path getBaseDirectory();
+
+  private static class CustomThreadFactory implements ForkJoinPool.ForkJoinWorkerThreadFactory {
+    @Override
+    public ForkJoinWorkerThread newThread(ForkJoinPool pool) {
+      var thread = new CustomForkJoinWorkerThread(pool);
+      thread.setContextClassLoader(Thread.currentThread().getContextClassLoader());
+      return thread;
+    }
+  }
+
+  private static class CustomForkJoinWorkerThread extends ForkJoinWorkerThread {
+    protected CustomForkJoinWorkerThread(ForkJoinPool pool) {
+      super(pool);
+    }
+  }
 }

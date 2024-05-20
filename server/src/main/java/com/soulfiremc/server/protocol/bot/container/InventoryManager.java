@@ -17,14 +17,7 @@
  */
 package com.soulfiremc.server.protocol.bot.container;
 
-import com.github.steveice10.mc.protocol.data.game.entity.metadata.ItemStack;
-import com.github.steveice10.mc.protocol.data.game.inventory.ClickItemAction;
-import com.github.steveice10.mc.protocol.data.game.inventory.ContainerActionType;
-import com.github.steveice10.mc.protocol.packet.ingame.serverbound.inventory.ServerboundContainerClickPacket;
-import com.github.steveice10.mc.protocol.packet.ingame.serverbound.inventory.ServerboundContainerClosePacket;
-import com.github.steveice10.mc.protocol.packet.ingame.serverbound.player.ServerboundSetCarriedItemPacket;
 import com.soulfiremc.server.data.EquipmentSlot;
-import com.soulfiremc.server.data.ItemType;
 import com.soulfiremc.server.protocol.BotConnection;
 import com.soulfiremc.server.protocol.bot.SessionDataManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
@@ -36,6 +29,12 @@ import java.util.concurrent.locks.ReentrantLock;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
+import org.geysermc.mcprotocollib.protocol.data.game.inventory.ClickItemAction;
+import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerActionType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.inventory.ServerboundContainerClickPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.inventory.ServerboundContainerClosePacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundSetCarriedItemPacket;
 
 @Data
 @RequiredArgsConstructor
@@ -43,7 +42,7 @@ public class InventoryManager {
   private final PlayerInventoryContainer playerInventory = new PlayerInventoryContainer(this);
   private final Int2ObjectMap<Container> containerData =
     new Int2ObjectOpenHashMap<>(Map.of(0, playerInventory));
-  private final Map<EquipmentSlot, ItemType> lastInEquipment = new EnumMap<>(EquipmentSlot.class);
+  private final Map<EquipmentSlot, SFItemStack> lastInEquipment = new EnumMap<>(EquipmentSlot.class);
   private final ReentrantLock inventoryControlLock = new ReentrantLock();
   @ToString.Exclude
   private final SessionDataManager dataManager;
@@ -163,12 +162,12 @@ public class InventoryManager {
     var previousItem = lastInEquipment.get(equipmentSlot);
     boolean hasChanged;
     if (previousItem != null) {
-      if (item == null || previousItem != item.type()) {
+      if (item == null || previousItem.type() != item.type()) {
         // Item before, but we don't have one now, or it's different
         hasChanged = true;
 
         // Remove the old item's modifiers
-        dataManager.clientEntity().attributeState().removeItemModifiers(previousItem);
+        dataManager.clientEntity().attributeState().removeItemModifiers(previousItem, equipmentSlot);
       } else {
         // Item before, and we have the same one now
         hasChanged = false;
@@ -178,10 +177,10 @@ public class InventoryManager {
       hasChanged = item != null;
     }
 
-    if (hasChanged && item != null && item.type().attributeSlot() == equipmentSlot) {
-      dataManager.clientEntity().attributeState().putItemModifiers(item.type());
+    if (hasChanged && item != null) {
+      dataManager.clientEntity().attributeState().putItemModifiers(item, equipmentSlot);
     }
 
-    lastInEquipment.put(equipmentSlot, item == null ? null : item.type());
+    lastInEquipment.put(equipmentSlot, item);
   }
 }

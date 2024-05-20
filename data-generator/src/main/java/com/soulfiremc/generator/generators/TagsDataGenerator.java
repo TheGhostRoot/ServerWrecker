@@ -50,7 +50,7 @@ public class TagsDataGenerator {
   public static class BlockTagsDataGenerator implements IDataGenerator {
     @Override
     public String getDataName() {
-      return "BlockTags.java";
+      return "java/BlockTags.java";
     }
 
     @Override
@@ -63,11 +63,7 @@ public class TagsDataGenerator {
           generateTag(BlockTags.class).stream()
             .map(
               s ->
-                "public static final ResourceKey "
-                  + s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_")
-                  + " = register(\""
-                  + s
-                  + "\");")
+                "public static final TagKey<BlockType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
             .toArray(String[]::new)));
     }
   }
@@ -75,7 +71,7 @@ public class TagsDataGenerator {
   public static class ItemTagsDataGenerator implements IDataGenerator {
     @Override
     public String getDataName() {
-      return "ItemTags.java";
+      return "java/ItemTags.java";
     }
 
     @Override
@@ -88,11 +84,7 @@ public class TagsDataGenerator {
           generateTag(ItemTags.class).stream()
             .map(
               s ->
-                "public static final ResourceKey "
-                  + s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_")
-                  + " = register(\""
-                  + s
-                  + "\");")
+                "public static final TagKey<ItemType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
             .toArray(String[]::new)));
     }
   }
@@ -100,7 +92,7 @@ public class TagsDataGenerator {
   public static class EntityTypeTagsDataGenerator implements IDataGenerator {
     @Override
     public String getDataName() {
-      return "EntityTypeTags.java";
+      return "java/EntityTypeTags.java";
     }
 
     @Override
@@ -113,11 +105,7 @@ public class TagsDataGenerator {
           generateTag(EntityTypeTags.class).stream()
             .map(
               s ->
-                "public static final ResourceKey "
-                  + s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_")
-                  + " = register(\""
-                  + s
-                  + "\");")
+                "public static final TagKey<EntityType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
             .toArray(String[]::new)));
     }
   }
@@ -125,7 +113,7 @@ public class TagsDataGenerator {
   public static class FluidTagsDataGenerator implements IDataGenerator {
     @Override
     public String getDataName() {
-      return "FluidTags.java";
+      return "java/FluidTags.java";
     }
 
     @Override
@@ -138,11 +126,7 @@ public class TagsDataGenerator {
           generateTag(FluidTags.class).stream()
             .map(
               s ->
-                "public static final ResourceKey "
-                  + s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_")
-                  + " = register(\""
-                  + s
-                  + "\");")
+                "public static final TagKey<FluidType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
             .toArray(String[]::new)));
     }
   }

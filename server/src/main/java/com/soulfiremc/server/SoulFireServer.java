@@ -26,7 +26,6 @@ import com.soulfiremc.server.api.SoulFireAPI;
 import com.soulfiremc.server.api.event.attack.AttackInitEvent;
 import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
 import com.soulfiremc.server.data.TranslationMapper;
-import com.soulfiremc.server.grpc.AuthSystem;
 import com.soulfiremc.server.grpc.RPCServer;
 import com.soulfiremc.server.plugins.AutoArmor;
 import com.soulfiremc.server.plugins.AutoEat;
@@ -53,7 +52,8 @@ import com.soulfiremc.server.settings.DevSettings;
 import com.soulfiremc.server.settings.ProxySettings;
 import com.soulfiremc.server.settings.lib.ServerSettingsRegistry;
 import com.soulfiremc.server.settings.lib.SettingsHolder;
-import com.soulfiremc.server.util.SFLogAppender;
+import com.soulfiremc.server.spark.SFSparkPlugin;
+import com.soulfiremc.server.user.AuthSystem;
 import com.soulfiremc.server.util.SFUpdateChecker;
 import com.soulfiremc.server.viaversion.SFViaLoader;
 import com.soulfiremc.server.viaversion.platform.SFViaAprilFools;
@@ -73,6 +73,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
@@ -93,7 +94,6 @@ import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.flattener.ComponentFlattener;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.pf4j.PluginManager;
 
@@ -109,6 +109,7 @@ public class SoulFireServer {
 
   private final Injector injector =
     new InjectorBuilder().addDefaultHandlers("com.soulfiremc").create();
+  @Getter
   private final ExecutorService threadPool = Executors.newCachedThreadPool();
   private final Map<String, String> serviceServerConfig = new HashMap<>();
   private final Int2ObjectMap<AttackManager> attacks =
@@ -118,15 +119,18 @@ public class SoulFireServer {
   private final SecretKey jwtSecretKey;
   private final PluginManager pluginManager;
   private final ShutdownManager shutdownManager;
+  private final Path baseDirectory;
 
   public SoulFireServer(
     String host,
     int port,
     PluginManager pluginManager,
     Instant startTime,
-    AuthSystem authSystem) {
+    AuthSystem authSystem,
+    Path baseDirectory) {
     this.pluginManager = pluginManager;
     this.shutdownManager = new ShutdownManager(this::shutdownHook, pluginManager);
+    this.baseDirectory = baseDirectory;
 
     // Register into injector
     injector.register(SoulFireServer.class, this);
@@ -135,11 +139,6 @@ public class SoulFireServer {
     SoulFireAPI.setSoulFire(this);
 
     injector.register(ShutdownManager.class, shutdownManager);
-
-    var logAppender = new SFLogAppender();
-    logAppender.start();
-    injector.register(SFLogAppender.class, logAppender);
-    ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).addAppender(logAppender);
 
     try {
       var keyGen = KeyGenerator.getInstance("HmacSHA256");
@@ -161,11 +160,12 @@ public class SoulFireServer {
 
     log.info("Starting SoulFire v{}...", BuildData.VERSION);
 
+    var configDirectory = SFPathConstants.getConfigDirectory(baseDirectory);
     var viaStart =
       CompletableFuture.runAsync(
         () -> {
           // Init via
-          var platform = new SFViaPlatform(SFPathConstants.CONFIG_FOLDER.resolve("ViaVersion"));
+          var platform = new SFViaPlatform(configDirectory.resolve("ViaVersion"));
 
           Via.init(
             ViaManagerImpl.builder()
@@ -184,14 +184,11 @@ public class SoulFireServer {
           Via.getManager()
             .addEnableListener(
               () -> {
-                new SFViaRewind(SFPathConstants.CONFIG_FOLDER.resolve("ViaRewind")).init();
-                new SFViaBackwards(SFPathConstants.CONFIG_FOLDER.resolve("ViaBackwards"))
-                  .init();
-                new SFViaAprilFools(SFPathConstants.CONFIG_FOLDER.resolve("ViaAprilFools"))
-                  .init();
-                new SFViaLegacy(SFPathConstants.CONFIG_FOLDER.resolve("ViaLegacy")).init();
-                new SFViaBedrock(SFPathConstants.CONFIG_FOLDER.resolve("ViaBedrock"))
-                  .init();
+                new SFViaRewind(configDirectory.resolve("ViaRewind")).init();
+                new SFViaBackwards(configDirectory.resolve("ViaBackwards")).init();
+                new SFViaAprilFools(configDirectory.resolve("ViaAprilFools")).init();
+                new SFViaLegacy(configDirectory.resolve("ViaLegacy")).init();
+                new SFViaBedrock(configDirectory.resolve("ViaBedrock")).init();
               });
 
           var manager = (ViaManagerImpl) Via.getManager();
@@ -200,6 +197,12 @@ public class SoulFireServer {
           manager.getPlatform().getConf().setCheckForUpdates(false);
 
           manager.onServerLoaded();
+        });
+    var sparkStart =
+      CompletableFuture.runAsync(
+        () -> {
+          var sparkPlugin = new SFSparkPlugin(configDirectory.resolve("spark"), this);
+          sparkPlugin.init();
         });
 
     var newVersion = new AtomicReference<String>();
@@ -210,7 +213,7 @@ public class SoulFireServer {
           newVersion.set(SFUpdateChecker.getInstance().join().getUpdateVersion().orElse(null));
         });
 
-    CompletableFuture.allOf(rpcServerStart, viaStart, updateCheck).join();
+    CompletableFuture.allOf(rpcServerStart, viaStart, sparkStart, updateCheck).join();
 
     if (newVersion.get() != null) {
       log.warn(
@@ -276,7 +279,6 @@ public class SoulFireServer {
     }
   }
 
-  @SuppressWarnings("UnstableApiUsage")
   public static void setupLoggingAndVia(SettingsHolder settingsHolder) {
     Via.getManager().debugHandler().setEnabled(settingsHolder.get(DevSettings.VIA_DEBUG));
     setupLogging(settingsHolder);

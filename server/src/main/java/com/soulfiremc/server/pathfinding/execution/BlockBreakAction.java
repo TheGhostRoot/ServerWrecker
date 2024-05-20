@@ -17,7 +17,6 @@
  */
 package com.soulfiremc.server.pathfinding.execution;
 
-import com.github.steveice10.mc.protocol.data.game.entity.RotationOrigin;
 import com.soulfiremc.server.data.BlockType;
 import com.soulfiremc.server.pathfinding.BotEntityState;
 import com.soulfiremc.server.pathfinding.Costs;
@@ -29,6 +28,7 @@ import com.soulfiremc.server.util.BlockTypeHelper;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.RotationOrigin;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -41,6 +41,7 @@ public final class BlockBreakAction implements WorldAction {
   private boolean didLook = false;
   private boolean putInHand = false;
   private int remainingTicks = -1;
+  private int totalTicks = -1;
 
   public BlockBreakAction(MovementMiningCost movementMiningCost) {
     this(movementMiningCost.block(), movementMiningCost.blockBreakSideHint(), movementMiningCost.willDrop());
@@ -51,6 +52,11 @@ public final class BlockBreakAction implements WorldAction {
     var level = connection.dataManager().currentLevel();
 
     return BlockTypeHelper.isEmptyBlock(level.getBlockState(blockPosition).blockType());
+  }
+
+  @Override
+  public SFVec3i targetPosition(BotConnection connection) {
+    return SFVec3i.fromDouble(connection.dataManager().clientEntity().pos());
   }
 
   @Override
@@ -91,7 +97,7 @@ public final class BlockBreakAction implements WorldAction {
         return;
       }
 
-      remainingTicks =
+      remainingTicks = totalTicks =
         Costs.getRequiredMiningTicks(
             dataManager.tagsState(),
             dataManager.clientEntity(),
@@ -113,8 +119,7 @@ public final class BlockBreakAction implements WorldAction {
 
   @Override
   public int getAllowedTicks() {
-    // 20-seconds max to break a block
-    return 20 * 20;
+    return totalTicks == -1 ? 20 : totalTicks + 20;
   }
 
   @Override

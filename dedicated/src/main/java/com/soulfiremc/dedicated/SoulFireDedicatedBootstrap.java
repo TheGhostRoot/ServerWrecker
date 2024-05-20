@@ -21,8 +21,12 @@ import com.soulfiremc.brigadier.GenericTerminalConsole;
 import com.soulfiremc.launcher.SoulFireAbstractBootstrap;
 import com.soulfiremc.server.ServerCommandManager;
 import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.brigadier.ServerConsoleCommandSource;
 import com.soulfiremc.server.grpc.DefaultAuthSystem;
+import com.soulfiremc.util.CommandHistoryManager;
 import com.soulfiremc.util.PortHelper;
+import com.soulfiremc.util.SFPathConstants;
+import java.nio.file.Path;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
@@ -46,15 +50,22 @@ public class SoulFireDedicatedBootstrap extends SoulFireAbstractBootstrap {
 
     GenericTerminalConsole.setupStreams();
     var soulFire =
-      new SoulFireServer(host, port, PLUGIN_MANAGER, START_TIME, new DefaultAuthSystem());
+      new SoulFireServer(host, port, pluginManager, START_TIME, new DefaultAuthSystem(), getBaseDirectory());
 
     log.info("Tip: To generate a new access token, use the command: 'generate-token'");
 
-    new GenericTerminalConsole(
+    new GenericTerminalConsole<>(
       soulFire.shutdownManager(),
-      soulFire.injector().getSingleton(ServerCommandManager.class))
+      ServerConsoleCommandSource.INSTANCE,
+      soulFire.injector().getSingleton(ServerCommandManager.class),
+      new CommandHistoryManager(SFPathConstants.WORKING_DIRECTORY))
       .start();
 
     soulFire.shutdownManager().awaitShutdown();
+  }
+
+  @Override
+  protected Path getBaseDirectory() {
+    return SFPathConstants.WORKING_DIRECTORY;
   }
 }

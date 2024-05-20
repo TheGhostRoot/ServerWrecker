@@ -25,7 +25,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 public class BlocksJavaGenerator implements IDataGenerator {
   @Override
   public String getDataName() {
-    return "BlockType.java";
+    return "java/BlockType.java";
   }
 
   @Override
@@ -39,11 +39,7 @@ public class BlocksJavaGenerator implements IDataGenerator {
           .map(
             s -> {
               var key = BuiltInRegistries.BLOCK.getKey(s);
-              return "public static final BlockType "
-                + key.getPath().toUpperCase(Locale.ROOT)
-                + " = register(\""
-                + key
-                + "\");";
+              return "public static final BlockType %s = register(\"%s\");".formatted(key.getPath().toUpperCase(Locale.ROOT), key);
             })
           .toArray(String[]::new)));
   }

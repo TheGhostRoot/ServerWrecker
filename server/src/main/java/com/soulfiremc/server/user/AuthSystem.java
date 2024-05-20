@@ -15,21 +15,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.data;
+package com.soulfiremc.server.user;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import java.util.Date;
 
-@Getter
-@RequiredArgsConstructor
-public enum TierType {
-  WOOD(0, 2),
-  STONE(1, 4),
-  IRON(2, 6),
-  DIAMOND(3, 8),
-  GOLD(0, 12),
-  NETHERITE(4, 9);
-
-  private final int level;
-  private final float miningSpeed;
+public interface AuthSystem {
+  /**
+   * Authenticates a user by subject and token issued at date.
+   *
+   * @param subject  The subject of the token
+   * @param issuedAt The date the token was made, use to check if the token is valid for that user.
+   *                 Use issuedAt to check if the token is valid for that user. If a user resets their password,
+   *                 the token should be invalidated by raising the required issuedAt date to the current date.
+   * @return The authenticated user
+   */
+  ServerCommandSource authenticate(String subject, Date issuedAt);
 }

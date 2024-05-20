@@ -26,14 +26,15 @@ import com.soulfiremc.server.protocol.bot.utils.SectionUtils;
 import com.soulfiremc.server.util.NoopLock;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import java.util.OptionalInt;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.cloudburstmc.math.vector.Vector3i;
 
 public class ChunkHolder implements BlockAccessor {
-  private static final BlockState VOID_AIR_BLOCK_STATE =
-    BlockState.forDefaultBlockType(BlockType.VOID_AIR);
+  private static final BlockState AIR_BLOCK_STATE = BlockState.forDefaultBlockType(BlockType.AIR);
+  private static final BlockState VOID_AIR_BLOCK_STATE = BlockState.forDefaultBlockType(BlockType.VOID_AIR);
   private final Long2ObjectOpenHashMap<ChunkData> chunks = new Long2ObjectOpenHashMap<>();
   private final Lock readLock;
   private final Lock writeLock;
@@ -121,7 +122,7 @@ public class ChunkHolder implements BlockAccessor {
   @Override
   public BlockState getBlockState(int x, int y, int z) {
     if (isOutsideBuildHeight(y)) {
-      return VOID_AIR_BLOCK_STATE;
+      return AIR_BLOCK_STATE;
     }
 
     var chunkData = getChunk(SectionUtils.blockToSection(x), SectionUtils.blockToSection(z));
@@ -132,6 +133,16 @@ public class ChunkHolder implements BlockAccessor {
     }
 
     return GlobalBlockPalette.INSTANCE.getBlockStateForStateId(chunkData.getBlock(x, y, z));
+  }
+
+  @Override
+  public OptionalInt minBuildHeight() {
+    return OptionalInt.of(minBuildHeight);
+  }
+
+  @Override
+  public OptionalInt maxBuildHeight() {
+    return OptionalInt.of(maxBuildHeight);
   }
 
   public Long2ObjectMap<ChunkData> getChunks() {

@@ -17,44 +17,45 @@
  */
 package com.soulfiremc.server.protocol;
 
-import com.github.steveice10.mc.protocol.MinecraftProtocol;
-import com.github.steveice10.mc.protocol.data.ProtocolState;
-import com.github.steveice10.mc.protocol.data.handshake.HandshakeIntent;
-import com.github.steveice10.mc.protocol.packet.common.clientbound.ClientboundDisconnectPacket;
-import com.github.steveice10.mc.protocol.packet.common.clientbound.ClientboundKeepAlivePacket;
-import com.github.steveice10.mc.protocol.packet.common.clientbound.ClientboundPingPacket;
-import com.github.steveice10.mc.protocol.packet.common.serverbound.ServerboundKeepAlivePacket;
-import com.github.steveice10.mc.protocol.packet.common.serverbound.ServerboundPongPacket;
-import com.github.steveice10.mc.protocol.packet.configuration.clientbound.ClientboundFinishConfigurationPacket;
-import com.github.steveice10.mc.protocol.packet.configuration.serverbound.ServerboundFinishConfigurationPacket;
-import com.github.steveice10.mc.protocol.packet.handshake.serverbound.ClientIntentionPacket;
-import com.github.steveice10.mc.protocol.packet.ingame.clientbound.ClientboundStartConfigurationPacket;
-import com.github.steveice10.mc.protocol.packet.ingame.serverbound.ServerboundConfigurationAcknowledgedPacket;
-import com.github.steveice10.mc.protocol.packet.login.clientbound.ClientboundGameProfilePacket;
-import com.github.steveice10.mc.protocol.packet.login.clientbound.ClientboundHelloPacket;
-import com.github.steveice10.mc.protocol.packet.login.clientbound.ClientboundLoginCompressionPacket;
-import com.github.steveice10.mc.protocol.packet.login.clientbound.ClientboundLoginDisconnectPacket;
-import com.github.steveice10.mc.protocol.packet.login.serverbound.ServerboundHelloPacket;
-import com.github.steveice10.mc.protocol.packet.login.serverbound.ServerboundKeyPacket;
-import com.github.steveice10.mc.protocol.packet.login.serverbound.ServerboundLoginAcknowledgedPacket;
-import com.github.steveice10.mc.protocol.packet.status.clientbound.ClientboundPongResponsePacket;
-import com.github.steveice10.mc.protocol.packet.status.clientbound.ClientboundStatusResponsePacket;
-import com.github.steveice10.mc.protocol.packet.status.serverbound.ServerboundPingRequestPacket;
-import com.github.steveice10.mc.protocol.packet.status.serverbound.ServerboundStatusRequestPacket;
-import com.github.steveice10.packetlib.Session;
-import com.github.steveice10.packetlib.event.session.ConnectedEvent;
-import com.github.steveice10.packetlib.event.session.SessionAdapter;
-import com.github.steveice10.packetlib.packet.Packet;
 import com.soulfiremc.server.protocol.netty.ViaClientSession;
 import com.soulfiremc.server.viaversion.SFVersionConstants;
-import com.viaversion.viaversion.api.connection.UserConnection;
 import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import net.raphimc.vialegacy.protocols.release.protocol1_7_2_5to1_6_4.storage.ProtocolMetadataStorage;
+import net.raphimc.vialegacy.protocol.release.r1_6_4tor1_7_2_5.storage.ProtocolMetadataStorage;
+import org.geysermc.mcprotocollib.network.Session;
+import org.geysermc.mcprotocollib.network.event.session.ConnectedEvent;
+import org.geysermc.mcprotocollib.network.event.session.SessionAdapter;
+import org.geysermc.mcprotocollib.network.packet.Packet;
+import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
+import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
+import org.geysermc.mcprotocollib.protocol.data.handshake.HandshakeIntent;
+import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundDisconnectPacket;
+import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundKeepAlivePacket;
+import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundPingPacket;
+import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundKeepAlivePacket;
+import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundPongPacket;
+import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundFinishConfigurationPacket;
+import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundSelectKnownPacks;
+import org.geysermc.mcprotocollib.protocol.packet.configuration.serverbound.ServerboundFinishConfigurationPacket;
+import org.geysermc.mcprotocollib.protocol.packet.configuration.serverbound.ServerboundSelectKnownPacks;
+import org.geysermc.mcprotocollib.protocol.packet.handshake.serverbound.ClientIntentionPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundStartConfigurationPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundConfigurationAcknowledgedPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundGameProfilePacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundHelloPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundLoginCompressionPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundLoginDisconnectPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.serverbound.ServerboundHelloPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.serverbound.ServerboundKeyPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.serverbound.ServerboundLoginAcknowledgedPacket;
+import org.geysermc.mcprotocollib.protocol.packet.status.clientbound.ClientboundPongResponsePacket;
+import org.geysermc.mcprotocollib.protocol.packet.status.clientbound.ClientboundStatusResponsePacket;
+import org.geysermc.mcprotocollib.protocol.packet.status.serverbound.ServerboundPingRequestPacket;
+import org.geysermc.mcprotocollib.protocol.packet.status.serverbound.ServerboundStatusRequestPacket;
 
 @RequiredArgsConstructor
 public class SFBaseListener extends SessionAdapter {
@@ -70,7 +71,7 @@ public class SFBaseListener extends SessionAdapter {
     var protocol = (MinecraftProtocol) session.getPacketProtocol();
     if (protocol.getState() == ProtocolState.LOGIN) {
       if (packet instanceof ClientboundHelloPacket helloPacket) {
-        UserConnection viaUserConnection = session.getFlag(SFProtocolConstants.VIA_USER_CONNECTION);
+        var viaUserConnection = session.getFlag(SFProtocolConstants.VIA_USER_CONNECTION);
 
         var authSupport = botConnection.minecraftAccount().isPremiumJava();
         if (!authSupport) {
@@ -141,6 +142,9 @@ public class SFBaseListener extends SessionAdapter {
     } else if (protocol.getState() == ProtocolState.CONFIGURATION) {
       if (packet instanceof ClientboundFinishConfigurationPacket) {
         session.send(new ServerboundFinishConfigurationPacket());
+      } else if (packet instanceof ClientboundSelectKnownPacks selectKnownPacks) {
+        session.send(new ServerboundSelectKnownPacks(BuiltInKnownPackRegistry.INSTANCE
+          .getMatchingPacks(selectKnownPacks.getKnownPacks())));
       }
     }
   }

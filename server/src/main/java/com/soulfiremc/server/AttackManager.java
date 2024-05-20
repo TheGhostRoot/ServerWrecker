@@ -17,7 +17,6 @@
  */
 package com.soulfiremc.server;
 
-import com.github.steveice10.mc.protocol.MinecraftProtocol;
 import com.soulfiremc.server.account.SFOfflineAuthService;
 import com.soulfiremc.server.api.AttackState;
 import com.soulfiremc.server.api.event.EventExceptionHandler;
@@ -38,6 +37,7 @@ import com.soulfiremc.server.viaversion.SFVersionConstants;
 import com.soulfiremc.settings.account.MinecraftAccount;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
+import com.viaversion.viaversion.api.protocol.version.VersionType;
 import io.netty.channel.EventLoopGroup;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -53,6 +53,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.inject.Inject;
@@ -61,6 +62,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import net.lenni0451.lambdaevents.LambdaManager;
 import net.lenni0451.lambdaevents.generator.ASMGenerator;
+import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +72,7 @@ public class AttackManager {
   private static final AtomicInteger ID_COUNTER = new AtomicInteger();
   private final int id = ID_COUNTER.getAndIncrement();
   private final Logger logger = LoggerFactory.getLogger("AttackManager-" + id);
+  private final SoulFireScheduler scheduler = new SoulFireScheduler(logger);
   private final LambdaManager eventBus =
     LambdaManager.basic(new ASMGenerator())
       .setExceptionHandler(EventExceptionHandler.INSTANCE)
@@ -82,7 +85,6 @@ public class AttackManager {
           }
         });
   private final Map<UUID, BotConnection> botConnections = new ConcurrentHashMap<>();
-  private final SoulFireScheduler scheduler = new SoulFireScheduler(logger);
   private final SoulFireServer soulFireServer;
   private final SettingsHolder settingsHolder;
   @Setter
@@ -175,7 +177,14 @@ public class AttackManager {
       SFNettyHelper.createEventLoopGroup(0, "Attack-%d".formatted(id));
 
     var protocolVersion =
-      settingsHolder.get(BotSettings.PROTOCOL_VERSION, ProtocolVersion::getClosest);
+      settingsHolder.get(BotSettings.PROTOCOL_VERSION, s -> {
+        var split = s.split("\\|");
+        if (split.length == 1) {
+          return ProtocolVersion.getClosest(split[0]);
+        }
+
+        return ProtocolVersion.getProtocol(VersionType.valueOf(split[0]), Integer.parseInt(split[1]));
+      });
     var isBedrock = SFVersionConstants.isBedrock(protocolVersion);
     var targetAddress = ResolveUtil.resolveAddress(isBedrock, settingsHolder);
 
@@ -217,11 +226,19 @@ public class AttackManager {
 
     eventBus.call(new AttackStartEvent(this));
 
+    var connectSemaphore = new Semaphore(settingsHolder.get(BotSettings.CONCURRENT_CONNECTS));
     return CompletableFuture.runAsync(
       () -> {
         while (!factories.isEmpty()) {
           var factory = factories.poll();
           if (factory == null) {
+            break;
+          }
+
+          try {
+            connectSemaphore.acquire();
+          } catch (InterruptedException e) {
+            logger.error("Error while waiting for connection slot", e);
             break;
           }
 
@@ -242,6 +259,8 @@ public class AttackManager {
                 botConnection.connect().get();
               } catch (Throwable e) {
                 logger.error("Error while connecting", e);
+              } finally {
+                connectSemaphore.release();
               }
             });
 

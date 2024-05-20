@@ -25,8 +25,10 @@ import com.soulfiremc.generator.generators.AttributesJavaGenerator;
 import com.soulfiremc.generator.generators.BlockCollisionShapesDataGenerator;
 import com.soulfiremc.generator.generators.BlocksDataGenerator;
 import com.soulfiremc.generator.generators.BlocksJavaGenerator;
+import com.soulfiremc.generator.generators.DefaultPacksDataGenerator;
 import com.soulfiremc.generator.generators.DefaultTagsDataGenerator;
 import com.soulfiremc.generator.generators.EffectsDataGenerator;
+import com.soulfiremc.generator.generators.EffectsJavaGenerator;
 import com.soulfiremc.generator.generators.EnchantmentsDataGenerator;
 import com.soulfiremc.generator.generators.EnchantmentsJavaGenerator;
 import com.soulfiremc.generator.generators.EntitiesDataGenerator;
@@ -38,6 +40,7 @@ import com.soulfiremc.generator.generators.ItemsDataGenerator;
 import com.soulfiremc.generator.generators.ItemsJavaGenerator;
 import com.soulfiremc.generator.generators.LanguageDataGenerator;
 import com.soulfiremc.generator.generators.MapColorJavaGenerator;
+import com.soulfiremc.generator.generators.PacketsGenerator;
 import com.soulfiremc.generator.generators.RegistryKeysDataGenerator;
 import com.soulfiremc.generator.generators.TagsDataGenerator;
 import com.soulfiremc.generator.generators.WorldExporterGenerator;
@@ -60,6 +63,7 @@ public class DataGenerators {
       new FluidsDataGenerator(),
       new FluidsJavaGenerator(),
       new EffectsDataGenerator(),
+      new EffectsJavaGenerator(),
       new EnchantmentsDataGenerator(),
       new EnchantmentsJavaGenerator(),
       new EntitiesDataGenerator(),
@@ -75,6 +79,7 @@ public class DataGenerators {
       new TagsDataGenerator.EntityTypeTagsDataGenerator(),
       new TagsDataGenerator.FluidTagsDataGenerator(),
       new DefaultTagsDataGenerator(),
+      new DefaultPacksDataGenerator(),
       new WorldExporterGenerator());
 
   private DataGenerators() {}
@@ -96,46 +101,56 @@ public class DataGenerators {
       try {
         var outputFileName = dataGenerator.getDataName();
         var outputFilePath = outputDirectory.resolve(outputFileName);
+        var outputFolder = outputFilePath.getParent();
+        Files.createDirectories(outputFolder);
+
         var outputElement = dataGenerator.generateDataJson();
 
-        if (outputElement instanceof JsonElement jsonElement) {
-          try (var writer =
-                 Files.newBufferedWriter(
-                   outputFilePath,
-                   StandardOpenOption.CREATE,
-                   StandardOpenOption.TRUNCATE_EXISTING)) {
-            var jsonWriter = new JsonWriter(writer);
-            jsonWriter.setIndent("  ");
-            Streams.write(jsonElement, jsonWriter);
+        switch (outputElement) {
+          case JsonElement jsonElement -> {
+            try (var writer =
+                   Files.newBufferedWriter(
+                     outputFilePath,
+                     StandardOpenOption.CREATE,
+                     StandardOpenOption.TRUNCATE_EXISTING)) {
+              var jsonWriter = new JsonWriter(writer);
+              jsonWriter.setIndent("  ");
+              Streams.write(jsonElement, jsonWriter);
+            }
           }
-        } else if (outputElement instanceof String string) {
-          try (var writer =
-                 Files.newBufferedWriter(
-                   outputFilePath,
-                   StandardOpenOption.CREATE,
-                   StandardOpenOption.TRUNCATE_EXISTING)) {
-            writer.write(string);
+          case String string -> {
+            try (var writer =
+                   Files.newBufferedWriter(
+                     outputFilePath,
+                     StandardOpenOption.CREATE,
+                     StandardOpenOption.TRUNCATE_EXISTING)) {
+              writer.write(string);
+            }
           }
-        } else if (outputElement instanceof byte[] bytes) {
-          try (var outputStream =
-                 Files.newOutputStream(
-                   outputFilePath,
-                   StandardOpenOption.CREATE,
-                   StandardOpenOption.TRUNCATE_EXISTING)) {
-            outputStream.write(bytes);
+          case byte[] bytes -> {
+            try (var outputStream =
+                   Files.newOutputStream(
+                     outputFilePath,
+                     StandardOpenOption.CREATE,
+                     StandardOpenOption.TRUNCATE_EXISTING)) {
+              outputStream.write(bytes);
+            }
           }
-        } else {
-          log.error("Unknown output type for data generator {}", dataGenerator.getDataName());
-          generatorsFailed++;
-          continue;
+          default -> {
+            log.error("Unknown output type for data generator {}", dataGenerator.getDataName());
+            generatorsFailed++;
+            continue;
+          }
         }
 
-        log.info("Generator: {} -> {}", dataGenerator.getDataName(), outputFileName);
+        log.info("Generator: {} -> {}", dataGenerator.getClass().getSimpleName(), outputFileName);
       } catch (Throwable exception) {
         log.error("Failed to run data generator {}", dataGenerator.getDataName(), exception);
         generatorsFailed++;
       }
     }
+
+    PacketsGenerator.generatePackets(outputDirectory.resolve("packets"));
 
     log.info("Finishing running data generators");
     return generatorsFailed == 0;

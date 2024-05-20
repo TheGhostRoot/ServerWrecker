@@ -17,7 +17,6 @@
  */
 package com.soulfiremc.server.plugins;
 
-import com.github.steveice10.mc.protocol.data.game.entity.RotationOrigin;
 import com.soulfiremc.server.api.PluginHelper;
 import com.soulfiremc.server.api.SoulFireAPI;
 import com.soulfiremc.server.api.event.bot.BotPreEntityTickEvent;
@@ -35,6 +34,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lenni0451.lambdaevents.EventHandler;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.RotationOrigin;
 
 @Slf4j
 public class KillAura implements InternalPlugin {
@@ -141,17 +141,15 @@ public class KillAura implements InternalPlugin {
       BUILDER.ofString(
         "whitelisted-user",
         "Whitelisted User",
-        new String[] {
-          "--kill-aura-whitelisted-user", "--kill-aura-whitelisted-username", "--kwu"
-        },
+        new String[] {"--kill-aura-whitelisted-username"},
         "This user will be ignored by the kill aura",
         "Pansexuel");
     public static final DoubleProperty HIT_RANGE =
       BUILDER.ofDouble(
         "hit-range",
         "Hit Range",
-        new String[] {"--kill-aura-hit-range", "--kill-aura-hit-distance", "--khr"},
-        "Distance for the kill aura where the bot will start hitting the entity",
+        new String[] {"--kill-aura-hit-range"},
+        "Range for the kill aura where the bot will start hitting the entity",
         3.0d,
         0.5d,
         6.0d,
@@ -160,8 +158,8 @@ public class KillAura implements InternalPlugin {
       BUILDER.ofDouble(
         "swing-range",
         "Swing Range",
-        new String[] {"--kill-aura-swing-range", "--kill-aura-swing-distance", "--ksr"},
-        "Distance for the kill aura where the bot will start swinging arm, set to 0 to disable",
+        new String[] {"--kill-aura-swing-range"},
+        "Range for the kill aura where the bot will start swinging arm, set to 0 to disable",
         3.5d,
         0.0d,
         10.0d,
@@ -170,8 +168,8 @@ public class KillAura implements InternalPlugin {
       BUILDER.ofDouble(
         "look-range",
         "Look Range",
-        new String[] {"--kill-aura-look-range", "--kill-aura-look-distance", "--klr"},
-        "Distance for the kill aura where the bot will start looking at the entity, set to 0 to disable",
+        new String[] {"--kill-aura-look-range"},
+        "Range for the kill aura where the bot will start looking at the entity, set to 0 to disable",
         4.8d,
         0.0d,
         25.0d,
@@ -180,14 +178,14 @@ public class KillAura implements InternalPlugin {
       BUILDER.ofBoolean(
         "check-walls",
         "Check Walls",
-        new String[] {"--kill-aura-check-walls", "--kill-aura-cw"},
+        new String[] {"--kill-aura-check-walls"},
         "Check if the entity is behind a wall",
         true);
     public static final BooleanProperty IGNORE_COOLDOWN =
       BUILDER.ofBoolean(
         "ignore-cooldown",
         "Ignore Cooldown",
-        new String[] {"--kill-aura-ignore-cooldown", "--kill-aura-ic"},
+        new String[] {"--kill-aura-ignore-cooldown"},
         "Ignore the 1.9+ attack cooldown to act like a 1.8 kill aura",
         false);
     public static final MinMaxPropertyLink ATTACK_DELAY_TICKS =

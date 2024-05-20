@@ -18,11 +18,17 @@
 package com.soulfiremc.server.pathfinding.execution;
 
 import com.soulfiremc.server.pathfinding.BotEntityState;
+import com.soulfiremc.server.pathfinding.SFVec3i;
 import com.soulfiremc.server.protocol.BotConnection;
 
 public final class RecalculatePathAction implements WorldAction {
   @Override
   public boolean isCompleted(BotConnection connection) {
+    throw new UnsupportedOperationException("Should be handled separately!");
+  }
+
+  @Override
+  public SFVec3i targetPosition(BotConnection connection) {
     throw new UnsupportedOperationException("Should be handled separately!");
   }
 
@@ -38,7 +44,8 @@ public final class RecalculatePathAction implements WorldAction {
 
   @Override
   public BotEntityState simulate(BotEntityState state) {
-    throw new UnsupportedOperationException("Should be handled separately!");
+    // This action does not change the state of the bot.
+    return state;
   }
 
   @Override

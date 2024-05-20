@@ -19,7 +19,6 @@ package com.soulfiremc.jmh;
 
 import com.google.gson.JsonObject;
 import com.soulfiremc.server.data.BlockType;
-import com.soulfiremc.server.data.ResourceKey;
 import com.soulfiremc.server.pathfinding.RouteFinder;
 import com.soulfiremc.server.pathfinding.SFVec3i;
 import com.soulfiremc.server.pathfinding.goals.PosGoal;
@@ -36,6 +35,8 @@ import java.io.InputStreamReader;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.GZIPInputStream;
 import lombok.extern.slf4j.Slf4j;
+import net.kyori.adventure.key.Key;
+import org.intellij.lang.annotations.Subst;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -56,22 +57,25 @@ public class PathfindingBenchmark {
       log.info("Reading world data...");
       var worldData = GsonInstance.GSON.fromJson(reader, JsonObject.class);
       var definitions = worldData.getAsJsonArray("definitions");
-      var blockDefinitions = new String[definitions.size()];
+      var blockDefinitions = new Key[definitions.size()];
       for (var i = 0; i < definitions.size(); i++) {
-        blockDefinitions[i] = definitions.get(i).getAsString();
+        @Subst("minecraft:air") var asString = definitions.get(i).getAsString();
+        blockDefinitions[i] = Key.key(asString);
       }
 
       var data = GsonInstance.GSON.fromJson(worldData.getAsJsonArray("data"), int[][][].class);
 
       log.info("Parsing world data...");
 
+      var maxY = 0;
       var accessor = new TestBlockAccessor();
       for (var x = 0; x < data.length; x++) {
         var xArray = data[x];
         for (var y = 0; y < xArray.length; y++) {
           var yArray = xArray[y];
           for (var z = 0; z < yArray.length; z++) {
-            accessor.setBlockAt(x, y, z, BlockType.getByKey(ResourceKey.fromString(blockDefinitions[yArray[z]])));
+            accessor.setBlockAt(x, y, z, BlockType.REGISTRY.getByKey(blockDefinitions[yArray[z]]));
+            maxY = Math.max(maxY, y);
           }
         }
       }
@@ -80,14 +84,16 @@ public class PathfindingBenchmark {
 
       // Find the first safe block at 0 0
       var safeY = 0;
-      for (var y = 0; y < 255; y++) {
-        if (accessor.getBlockState(0, y, 0).blockType() == BlockType.AIR) {
-          safeY = y;
+      for (var y = maxY; y >= 0; y--) {
+        if (accessor.getBlockState(0, y, 0).blockType() != BlockType.AIR) {
+          safeY = y + 1;
           break;
         }
       }
 
       initialState = new SFVec3i(0, safeY, 0);
+      log.info("Initial state: {}", initialState.formatXYZ());
+
       routeFinder = new RouteFinder(new MinecraftGraph(new TagsState(),
         new ProjectedLevel(accessor), new ProjectedInventory(new PlayerInventoryContainer(null)),
         true, true), new PosGoal(100, 80, 100));

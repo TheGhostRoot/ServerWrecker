@@ -17,17 +17,25 @@
  */
 package com.soulfiremc.server.pathfinding.graph.actions;
 
+import com.soulfiremc.server.data.BlockItems;
+import com.soulfiremc.server.data.BlockState;
 import com.soulfiremc.server.pathfinding.Costs;
 import com.soulfiremc.server.pathfinding.SFVec3i;
 import com.soulfiremc.server.pathfinding.execution.BlockBreakAction;
 import com.soulfiremc.server.pathfinding.graph.BlockFace;
 import com.soulfiremc.server.pathfinding.graph.GraphInstructions;
+import com.soulfiremc.server.pathfinding.graph.MinecraftGraph;
 import com.soulfiremc.server.pathfinding.graph.actions.movement.BlockSafetyData;
 import com.soulfiremc.server.pathfinding.graph.actions.movement.MovementMiningCost;
 import com.soulfiremc.server.pathfinding.graph.actions.movement.SkyDirection;
+import com.soulfiremc.server.util.BlockTypeHelper;
+import com.soulfiremc.server.util.LazyBoolean;
 import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -40,15 +48,69 @@ public final class DownMovement extends GraphAction implements Cloneable {
   @Getter
   @Setter
   private int closestBlockToFallOn = Integer.MIN_VALUE;
+  @Getter
+  @Setter
+  private int closestObstructingBlock = Integer.MIN_VALUE;
 
   public DownMovement() {
     this.targetToMineBlock = FEET_POSITION_RELATIVE_BLOCK.sub(0, 1, 0);
+  }
+
+  public static void registerDownMovements(
+    Consumer<GraphAction> callback,
+    BiConsumer<SFVec3i, MinecraftGraph.MovementSubscription<?>> blockSubscribers) {
+    callback.accept(registerDownMovement(blockSubscribers, new DownMovement()));
+  }
+
+  public static DownMovement registerDownMovement(
+    BiConsumer<SFVec3i, MinecraftGraph.MovementSubscription<?>> blockSubscribers,
+    DownMovement movement) {
+    {
+      for (var safetyBlock : movement.listSafetyCheckBlocks()) {
+        blockSubscribers
+          .accept(safetyBlock, new DownMovementBlockSubscription(DownMovementBlockSubscription.SubscriptionType.DOWN_SAFETY_CHECK));
+      }
+    }
+
+    {
+      for (var obstructingBlock : movement.listObstructFallCheckBlocks()) {
+        blockSubscribers
+          .accept(obstructingBlock, new DownMovementBlockSubscription(DownMovementBlockSubscription.SubscriptionType.MOVEMENT_OBSTRUCTING_FALL_CHECK));
+      }
+    }
+
+    {
+      var freeBlock = movement.blockToBreak();
+      blockSubscribers
+        .accept(freeBlock.key(), new DownMovementBlockSubscription(DownMovementBlockSubscription.SubscriptionType.MOVEMENT_FREE, 0, freeBlock.value()));
+    }
+
+    {
+      var safeBlocks = movement.listCheckSafeMineBlocks();
+      for (var i = 0; i < safeBlocks.length; i++) {
+        var savedBlock = safeBlocks[i];
+        if (savedBlock == null) {
+          continue;
+        }
+
+        for (var block : savedBlock) {
+          blockSubscribers
+            .accept(block.position(), new DownMovementBlockSubscription(
+              DownMovementBlockSubscription.SubscriptionType.MOVEMENT_BREAK_SAFETY_CHECK,
+              i,
+              block.type()));
+        }
+      }
+    }
+
+    return movement;
   }
 
   public Pair<SFVec3i, BlockFace> blockToBreak() {
     return Pair.of(targetToMineBlock, BlockFace.TOP);
   }
 
+  // These blocks are possibly safe blocks we can fall on top of
   public List<SFVec3i> listSafetyCheckBlocks() {
     var requiredFreeBlocks = new ObjectArrayList<SFVec3i>();
 
@@ -60,6 +122,18 @@ public final class DownMovement extends GraphAction implements Cloneable {
 
     // Falls three blocks
     requiredFreeBlocks.add(FEET_POSITION_RELATIVE_BLOCK.sub(0, 4, 0));
+
+    return requiredFreeBlocks;
+  }
+
+  public List<SFVec3i> listObstructFallCheckBlocks() {
+    var requiredFreeBlocks = new ObjectArrayList<SFVec3i>();
+
+    // Block below the block we mine can obstruct a 2 block fall
+    requiredFreeBlocks.add(FEET_POSITION_RELATIVE_BLOCK.sub(0, 2, 0));
+
+    // Block below the block we mine can obstruct a 3 block fall
+    requiredFreeBlocks.add(FEET_POSITION_RELATIVE_BLOCK.sub(0, 3, 0));
 
     return requiredFreeBlocks;
   }
@@ -88,12 +162,11 @@ public final class DownMovement extends GraphAction implements Cloneable {
   }
 
   @Override
-  public boolean impossibleToComplete() {
-    return closestBlockToFallOn == Integer.MIN_VALUE;
-  }
+  public List<GraphInstructions> getInstructions(SFVec3i node) {
+    if (closestBlockToFallOn == Integer.MIN_VALUE || closestObstructingBlock > closestBlockToFallOn) {
+      return Collections.emptyList();
+    }
 
-  @Override
-  public GraphInstructions getInstructions(SFVec3i node) {
     var cost = 0D;
 
     cost +=
@@ -108,10 +181,10 @@ public final class DownMovement extends GraphAction implements Cloneable {
 
     var absoluteTargetFeetBlock = node.add(0, closestBlockToFallOn + 1, 0);
 
-    return new GraphInstructions(
+    return Collections.singletonList(new GraphInstructions(
       absoluteTargetFeetBlock,
       cost,
-      List.of(new BlockBreakAction(breakCost)));
+      List.of(new BlockBreakAction(breakCost))));
   }
 
   @Override
@@ -125,6 +198,113 @@ public final class DownMovement extends GraphAction implements Cloneable {
       return (DownMovement) super.clone();
     } catch (CloneNotSupportedException cantHappen) {
       throw new InternalError();
+    }
+  }
+
+  record DownMovementBlockSubscription(
+    SubscriptionType type,
+    int blockArrayIndex,
+    BlockFace blockBreakSideHint,
+    BlockSafetyData.BlockSafetyType safetyType) implements MinecraftGraph.MovementSubscription<DownMovement> {
+    DownMovementBlockSubscription(SubscriptionType type) {
+      this(type, -1, null, null);
+    }
+
+    DownMovementBlockSubscription(SubscriptionType type, int blockArrayIndex, BlockFace blockBreakSideHint) {
+      this(type, blockArrayIndex, blockBreakSideHint, null);
+    }
+
+    DownMovementBlockSubscription(
+      SubscriptionType subscriptionType,
+      int i,
+      BlockSafetyData.BlockSafetyType type) {
+      this(subscriptionType, i, null, type);
+    }
+
+    @Override
+    public MinecraftGraph.SubscriptionSingleResult processBlock(MinecraftGraph graph, SFVec3i key, DownMovement downMovement, LazyBoolean isFree,
+                                                                BlockState blockState, SFVec3i absoluteKey) {
+      return switch (type) {
+        case MOVEMENT_FREE -> {
+          if (graph.disallowedToBreakBlock(absoluteKey)
+            || !BlockTypeHelper.isDiggable(blockState.blockType())
+            // Narrows the list down to a reasonable size
+            || !BlockItems.hasItemType(blockState.blockType())) {
+            // No way to break this block
+            yield MinecraftGraph.SubscriptionSingleResult.IMPOSSIBLE;
+          }
+
+          var cacheableMiningCost = graph.inventory().getMiningCosts(graph.tagsState(), blockState);
+          // We can mine this block, lets add costs and continue
+          downMovement.breakCost(
+            new MovementMiningCost(
+              absoluteKey,
+              cacheableMiningCost.miningCost(),
+              cacheableMiningCost.willDrop(),
+              blockBreakSideHint));
+          yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+        }
+        case DOWN_SAFETY_CHECK -> {
+          var yLevel = key.y;
+
+          if (yLevel < downMovement.closestBlockToFallOn()) {
+            // We already found a block to fall on, above this one
+            yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+          }
+
+          if (BlockTypeHelper.isSafeBlockToStandOn(blockState)) {
+            // We found a block to fall on
+            downMovement.closestBlockToFallOn(yLevel);
+          }
+
+          yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+        }
+        case MOVEMENT_BREAK_SAFETY_CHECK -> {
+          var unsafe = safetyType.isUnsafeBlock(blockState);
+
+          if (unsafe) {
+            // We know already WE MUST dig the block below for this action
+            // So if one block around the block below is unsafe, we can't do this action
+            yield MinecraftGraph.SubscriptionSingleResult.IMPOSSIBLE;
+          }
+
+          // All good, we can continue
+          yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+        }
+        case MOVEMENT_OBSTRUCTING_FALL_CHECK -> {
+          var yLevel = key.y;
+
+          if (yLevel < downMovement.closestObstructingBlock()) {
+            // We already found a higher obstructing block
+            yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+          }
+
+          if (yLevel < downMovement.closestBlockToFallOn()) {
+            // We only search blocks above the closest block to fall on
+            yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+          }
+
+          if (isFree.get()) {
+            yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+          }
+
+          // We found a block that obstructs our fall
+          downMovement.closestObstructingBlock(yLevel);
+          yield MinecraftGraph.SubscriptionSingleResult.CONTINUE;
+        }
+      };
+    }
+
+    @Override
+    public DownMovement castAction(GraphAction action) {
+      return (DownMovement) action;
+    }
+
+    enum SubscriptionType {
+      MOVEMENT_FREE,
+      DOWN_SAFETY_CHECK,
+      MOVEMENT_BREAK_SAFETY_CHECK,
+      MOVEMENT_OBSTRUCTING_FALL_CHECK
     }
   }
 }

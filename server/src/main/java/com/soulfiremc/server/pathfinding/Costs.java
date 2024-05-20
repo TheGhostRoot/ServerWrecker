@@ -17,21 +17,24 @@
  */
 package com.soulfiremc.server.pathfinding;
 
-import com.github.steveice10.mc.protocol.data.game.entity.Effect;
+import com.soulfiremc.server.data.AttributeType;
 import com.soulfiremc.server.data.BlockState;
 import com.soulfiremc.server.data.BlockType;
 import com.soulfiremc.server.data.EnchantmentType;
 import com.soulfiremc.server.data.FluidTags;
-import com.soulfiremc.server.data.ItemType;
-import com.soulfiremc.server.data.ToolSpeedType;
+import com.soulfiremc.server.data.RegistryKeys;
+import com.soulfiremc.server.data.TagKey;
 import com.soulfiremc.server.pathfinding.graph.ProjectedInventory;
 import com.soulfiremc.server.protocol.bot.container.PlayerInventoryContainer;
 import com.soulfiremc.server.protocol.bot.container.SFItemStack;
 import com.soulfiremc.server.protocol.bot.state.EntityEffectState;
 import com.soulfiremc.server.protocol.bot.state.TagsState;
 import com.soulfiremc.server.protocol.bot.state.entity.ClientEntity;
-import com.soulfiremc.server.util.MathHelper;
+import java.util.Arrays;
 import java.util.OptionalInt;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.Effect;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.HolderSet;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -148,18 +151,51 @@ public class Costs {
     boolean onGround,
     @Nullable SFItemStack itemStack,
     BlockType blockType) {
-    float speedMultiplier;
-    if (itemStack == null) {
-      speedMultiplier = 1;
-    } else {
-      speedMultiplier = ToolSpeedType.getBlockToolSpeed(tagsState, itemStack.type(), blockType);
+    var correctToolUsed = isCorrectToolUsed(tagsState, itemStack, blockType);
+
+    // If this value adds up over all ticks to 1, the block is fully mined
+    var damage = getBlockDamagePerTick(tagsState, entity, inventoryContainer, onGround, itemStack, blockType);
+
+    // Insta mine
+    if (damage >= 1) {
+      return new TickResult(0, correctToolUsed);
     }
+
+    return new TickResult((int) Math.ceil(1 / damage), correctToolUsed);
+  }
+
+  private static float getBlockDamagePerTick(TagsState tagsState,
+                                             @Nullable ClientEntity entity,
+                                             @Nullable PlayerInventoryContainer inventoryContainer,
+                                             boolean onGround,
+                                             @Nullable SFItemStack itemStack,
+                                             BlockType blockType) {
+    if (entity != null && entity.abilities().creativeModeBreak()) {
+      // We instantly break any block in creative mode
+      return 1.0F;
+    }
+
+    var blockDestroyTime = blockType.destroyTime();
+    if (blockDestroyTime == -1.0F) {
+      return 0.0F;
+    } else {
+      var currentToolDivision = isCorrectToolUsed(tagsState, itemStack, blockType) ? 30 : 100;
+      return getPlayerBlockDamagePerTick(tagsState, entity, inventoryContainer, onGround, itemStack, blockType)
+        / blockDestroyTime / (float) currentToolDivision;
+    }
+  }
+
+  private static float getPlayerBlockDamagePerTick(TagsState tagsState,
+                                                   @Nullable ClientEntity entity,
+                                                   @Nullable PlayerInventoryContainer inventoryContainer,
+                                                   boolean onGround,
+                                                   @Nullable SFItemStack itemStack,
+                                                   BlockType blockType) {
+    var speedMultiplier = getSpeedMultiplier(tagsState, itemStack, blockType);
 
     if (itemStack != null && speedMultiplier > 1) {
       var efficiency = itemStack.getEnchantmentLevel(EnchantmentType.EFFICIENCY);
       if (efficiency > 0) {
-        // Efficiency is capped at 255
-        efficiency = MathHelper.shortClamp(efficiency, (short) 0, (short) 255);
         speedMultiplier += (float) (efficiency * efficiency + 1);
       }
     }
@@ -181,6 +217,7 @@ public class Costs {
           };
       }
 
+      speedMultiplier *= (float) entity.attributeValue(AttributeType.PLAYER_BLOCK_BREAK_SPEED);
       if (inventoryContainer != null && entity.isEyeInFluid(FluidTags.WATER)
         && !inventoryContainer.hasEnchantment(EnchantmentType.AQUA_AFFINITY)) {
         speedMultiplier /= 5.0F;
@@ -191,31 +228,57 @@ public class Costs {
       speedMultiplier /= 5.0F;
     }
 
-    var damage = speedMultiplier / blockType.destroyTime();
-
-    var correctToolUsed =
-      isCorrectToolUsed(tagsState, itemStack == null ? null : itemStack.type(), blockType);
-    damage /= correctToolUsed ? 30 : 100;
-
-    // Insta mine
-    if (damage > 1) {
-      return new TickResult(0, correctToolUsed);
-    }
-
-    return new TickResult((int) Math.ceil(1 / damage), correctToolUsed);
+    return speedMultiplier;
   }
 
-  private static boolean isCorrectToolUsed(
-    TagsState tagsState, ItemType itemType, BlockType blockType) {
+  private static float getSpeedMultiplier(
+    TagsState tagsState, SFItemStack itemStack, BlockType blockType) {
+    if (itemStack == null) {
+      return 1;
+    }
+
+    var tool = itemStack.components().getOptional(DataComponentType.TOOL);
+    if (tool.isEmpty()) {
+      return 1;
+    }
+
+    for (var rule : tool.get().getRules()) {
+      if (rule.getSpeed() != null && isInHolderSet(tagsState, rule.getHolderSet(), blockType)) {
+        return rule.getSpeed();
+      }
+    }
+
+    return tool.get().getDefaultMiningSpeed();
+  }
+
+  private static boolean isCorrectToolUsed(TagsState tagsState, SFItemStack itemStack, BlockType blockType) {
     if (!blockType.requiresCorrectToolForDrops()) {
       return true;
     }
 
-    if (itemType == null) {
+    if (itemStack == null) {
       return false;
     }
 
-    return ToolSpeedType.isRightToolFor(tagsState, itemType, blockType);
+    var tool = itemStack.components().getOptional(DataComponentType.TOOL);
+    if (tool.isEmpty()) {
+      return false;
+    }
+
+    for (var rule : tool.get().getRules()) {
+      if (rule.getCorrectForDrops() != null && isInHolderSet(tagsState, rule.getHolderSet(), blockType)) {
+        return rule.getCorrectForDrops();
+      }
+    }
+
+    return false;
+  }
+
+  @SuppressWarnings("PatternValidation")
+  private static boolean isInHolderSet(TagsState tagsState, HolderSet holderSet, BlockType blockType) {
+    return Arrays.stream(holderSet.resolve(t -> tagsState.getValuesOfTag(blockType,
+        TagKey.key(t, RegistryKeys.BLOCK)).toIntArray()))
+      .anyMatch(i -> i == blockType.id());
   }
 
   private static OptionalInt getDigSpeedAmplifier(EntityEffectState effectState) {

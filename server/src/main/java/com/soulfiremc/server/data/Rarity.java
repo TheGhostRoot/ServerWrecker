@@ -15,20 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.grpc;
+package com.soulfiremc.server.data;
 
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-
-public interface AuthenticatedUser {
-  String getUsername();
-
-  boolean canAccess(Resource resource);
-
-  default void canAccessOrThrow(Resource resource) {
-    if (!canAccess(resource)) {
-      throw new StatusRuntimeException(
-        Status.PERMISSION_DENIED.withDescription("You do not have permission to access this resource"));
-    }
-  }
+public enum Rarity {
+  COMMON,
+  UNCOMMON,
+  RARE,
+  EPIC
 }

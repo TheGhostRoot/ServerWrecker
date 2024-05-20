@@ -15,14 +15,27 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.protocol.bot.model;
+package com.soulfiremc.server.protocol.bot.state;
 
-import com.github.steveice10.opennbt.tag.builtin.CompoundTag;
-import com.github.steveice10.opennbt.tag.builtin.IntTag;
-import com.github.steveice10.opennbt.tag.builtin.StringTag;
+import com.soulfiremc.server.data.Registry;
+import com.soulfiremc.server.data.RegistryValue;
+import lombok.Getter;
+import net.kyori.adventure.key.Key;
+import org.cloudburstmc.nbt.NbtMap;
 
-public record BiomeData(String name, int id) {
-  public BiomeData(CompoundTag data) {
-    this(data.<StringTag>get("name").getValue(), data.<IntTag>get("id").getValue());
+@Getter
+public class Biome implements RegistryValue<Biome> {
+  private final Registry<Biome> registry;
+  private final Key key;
+  private final int id;
+  private final float temperature;
+  private final float downfall;
+
+  public Biome(Registry<Biome> registry, Key key, int id, NbtMap biomeData) {
+    this.registry = registry;
+    this.key = key;
+    this.id = id;
+    this.temperature = biomeData.getFloat("temperature");
+    this.downfall = biomeData.getFloat("downfall");
   }
 }

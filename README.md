@@ -37,44 +37,20 @@ performance.
 * Load and save profiles for quick access
 * Support for online and offline mode servers
 * Supports [almost every Minecraft version](#-version-support)
-* Use Microsoft, The Altening, EasyMC or Offline accounts
-* Use HTTP/SOCKS4/SOCKS5 proxies
-* Multiple [built-in plugins](#-plugins) like AutoRespawn, AutoJump, ClientSettings and more
+* Use `Microsoft`, `The Altening`, `EasyMC` or `Offline` accounts
+* Use `HTTP`, `SOCKS4` and `SOCKS5` proxies
+* Multiple [built-in plugins](#-plugins) like `AutoRespawn`, `AutoJump`, `ClientSettings` and more
 * Console command support
 * A* Pathfinding (Diagonal moves, parkour, mining blocks, placing blocks)
 
-## ✨ Nightly builds
+## 🖥 Installation
 
-You can download the latest development version of SoulFire
-through [nightly.link](https://nightly.link/AlexProgrammerDE/SoulFire/workflows/build/main/SoulFire.zip).
-
-## 🔭 Requirements
-
-* Java 21+
-* Minecraft server (Tested with Spigot/Paper/Purpur/Folia, Velocity/BungeeCord)
+For installing SoulFire, please refer to the [installation guide](https://soulfiremc.com/docs/installation).
 
 ## 🍿 Version support
 
-SoulFire supports many versions of Minecraft, including releases, april fools snapshots, beta, alpha,
-classic (including [CPE](https://wiki.vg/Classic_Protocol_Extension)) and even Minecraft Bedrock edition,
-and that includes every single subversion, not just a few specific versions.
-
 You can find an up-to-date list of supported versions in
 the [documentation](https://soulfiremc.com/docs/usage/versions).
-
-### How does this work?
-
-Thanks to a built-in implementation of [ViaVersion](https://github.com/ViaVersion/ViaVersion),
-[ViaLegacy](https://github.com/RaphiMC/ViaLegacy), [ViaBedrock](https://github.com/RaphiMC/ViaBedrock) and many others,
-a SoulFire bot can connect to all these versions even without the server having ViaVersion installed.
-The packet translation happens "client/bot side".
-This feature takes inspiration from services like [VIAaaS](https://github.com/ViaVersion/VIAaaS)
-and [ViaProxy](https://github.com/RaphiMC/ViaProxy),
-which include client-side translation externally.
-
-## 🎬 Videos
-
-[Download & install SoulFire](https://youtu.be/X9hREa17yAo)
 
 ## ⌨ Commands
 
@@ -90,20 +66,19 @@ You can read about the SoulFire plugins in the [documentation](https://soulfirem
 You can read about how to import accounts in the [account documentation](https://soulfiremc.com/docs/usage/accounts) and
 how to import proxies in the [proxy documentation](https://soulfiremc.com/docs/usage/proxies).
 
+## 💻 Command Line Usage
+
+If you want to use the CLI of SoulFire, please refer to the [CLI Mode Guide](https://soulfiremc.com/docs/guides/cli-mode).
+
 ## 🧵 Demo
 
 SoulFire has a built-in GUI for easy usage.
 ![GUI](./assets/demo.png)
 
-## 💻 Command Line Usage
+## ✨ Nightly builds
 
-To run SoulFire from the command line without a GUI, enter:
-`java -jar SoulFire.jar <flags>`
-
-> **Note:** Some features are not available in CLI mode, we recommend using the GUI.
-
-For a list of all available CLI flags, look at the [documentation](https://soulfiremc.com/docs/usage/cli-flags)
-or run `java -jar SoulFire.jar --help`.
+You can download the latest development version of SoulFire
+through [nightly.link](https://nightly.link/AlexProgrammerDE/SoulFire/workflows/build/main/SoulFire.zip).
 
 ## 🔧 Build from source
 

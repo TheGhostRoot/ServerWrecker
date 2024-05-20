@@ -20,13 +20,13 @@ package com.soulfiremc.server.account;
 import com.soulfiremc.server.util.UUIDHelper;
 import com.soulfiremc.settings.account.AuthType;
 import com.soulfiremc.settings.account.MinecraftAccount;
-import com.soulfiremc.settings.account.service.OnlineJavaData;
+import com.soulfiremc.settings.account.service.OnlineSimpleJavaData;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.soulfiremc.util.GsonInstance;
 import com.soulfiremc.util.ReactorHttpHelper;
-import java.io.IOException;
 import java.net.URI;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
@@ -42,7 +42,7 @@ public final class SFTheAlteningAuthService
     "SoulFireIsCool"; // Password doesn't matter for The Altening
 
   @Override
-  public MinecraftAccount login(TheAlteningAuthData data, SFProxy proxyData) throws IOException {
+  public CompletableFuture<MinecraftAccount> login(TheAlteningAuthData data, SFProxy proxyData) {
     var request = new AuthenticationRequest(data.altToken, PASSWORD, UUID.randomUUID().toString());
     return ReactorHttpHelper.createReactorClient(proxyData, true)
       .post()
@@ -62,14 +62,20 @@ public final class SFTheAlteningAuthService
                   AuthType.THE_ALTENING,
                   UUIDHelper.convertToDashed(response.selectedProfile().id()),
                   response.selectedProfile().name(),
-                  new OnlineJavaData(response.accessToken(), -1));
+                  new OnlineSimpleJavaData(response.accessToken(), -1));
               }))
-      .block();
+      .toFuture();
   }
 
   @Override
   public TheAlteningAuthData createData(String data) {
     return new TheAlteningAuthData(data);
+  }
+
+  @Override
+  public CompletableFuture<MinecraftAccount> refresh(MinecraftAccount account, SFProxy proxyData) {
+    // TODO: Figure out The Altening refreshing
+    return CompletableFuture.completedFuture(account);
   }
 
   public record TheAlteningAuthData(String altToken) {}

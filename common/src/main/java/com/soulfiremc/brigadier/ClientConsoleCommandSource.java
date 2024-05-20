@@ -15,11 +15,32 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.pathfinding.execution;
+package com.soulfiremc.brigadier;
 
-public final class UnrecoverablePathErrorException extends Exception {
-  public UnrecoverablePathErrorException() {
-    super(
-      "Something went wrong while executing the path! This path is unrecoverable! Trying to recalculate the path...");
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ClientConsoleCommandSource implements CommandSource {
+  public static final ClientConsoleCommandSource INSTANCE = new ClientConsoleCommandSource();
+  private static final Logger log = LoggerFactory.getLogger("Console");
+
+  @Override
+  public void sendInfo(String message, Object... args) {
+    log.info(message, args);
+  }
+
+  @Override
+  public void sendWarn(String message, Object... args) {
+    log.warn(message, args);
+  }
+
+  @Override
+  public void sendError(String message, Throwable t) {
+    log.error(message, t);
+  }
+
+  @Override
+  public void sendMessage(String message) {
+    log.info(message);
   }
 }

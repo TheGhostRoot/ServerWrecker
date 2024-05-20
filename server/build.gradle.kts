@@ -9,8 +9,11 @@ dependencies {
   api(projects.common)
 
   // Main protocol library
-  api(libs.mcprotocollib)
+  api(libs.mcprotocollib) {
+    exclude("io.netty")
+  }
   api(libs.bundles.kyori)
+  api(libs.datafixerupper)
 
   // For advanced encryption and compression
   api(libs.velocity.native)
@@ -33,7 +36,7 @@ dependencies {
 
   // For Bedrock support
   api(libs.via.bedrock) {
-    exclude("io.netty", "netty-codec-http")
+    exclude("io.netty")
   }
 
   // For YAML support (ViaVersion)
@@ -44,6 +47,9 @@ dependencies {
     exclude("com.google.code.gson", "gson")
     exclude("org.slf4j", "slf4j-api")
   }
+
+  // For profiling
+  api(libs.spark)
 
   testImplementation(libs.junit)
 }

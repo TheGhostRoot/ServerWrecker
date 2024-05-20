@@ -19,37 +19,65 @@ package com.soulfiremc.server.protocol.bot.state;
 
 import com.soulfiremc.server.data.Attribute;
 import com.soulfiremc.server.data.AttributeType;
-import com.soulfiremc.server.data.ItemType;
+import com.soulfiremc.server.data.EquipmentSlot;
+import com.soulfiremc.server.data.ModifierOperation;
+import com.soulfiremc.server.protocol.bot.container.SFItemStack;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.Data;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.ItemAttributeModifiers;
 
 @Data
 public class EntityAttributeState {
-  private final Map<AttributeType, AttributeState> attributeStore =
-    new Object2ObjectOpenHashMap<>();
+  private final Map<AttributeType, AttributeState> attributeStore = new Object2ObjectOpenHashMap<>();
+
+  private static boolean isNotPartOf(ItemAttributeModifiers.EquipmentSlotGroup itemSlot, EquipmentSlot comparedTo) {
+    return !switch (itemSlot) {
+      case ANY -> true;
+      case MAIN_HAND -> comparedTo == EquipmentSlot.MAINHAND;
+      case OFF_HAND -> comparedTo == EquipmentSlot.OFFHAND;
+      case HAND -> comparedTo == EquipmentSlot.MAINHAND || comparedTo == EquipmentSlot.OFFHAND;
+      case FEET -> comparedTo == EquipmentSlot.FEET;
+      case LEGS -> comparedTo == EquipmentSlot.LEGS;
+      case CHEST -> comparedTo == EquipmentSlot.CHEST;
+      case HEAD -> comparedTo == EquipmentSlot.HEAD;
+      case ARMOR -> comparedTo == EquipmentSlot.CHEST || comparedTo == EquipmentSlot.LEGS || comparedTo == EquipmentSlot.FEET;
+      case BODY -> comparedTo == EquipmentSlot.HEAD || comparedTo == EquipmentSlot.CHEST || comparedTo == EquipmentSlot.LEGS || comparedTo == EquipmentSlot.FEET;
+    };
+  }
 
   public AttributeState getOrCreateAttribute(AttributeType type) {
     return attributeStore.computeIfAbsent(type, k -> new AttributeState(type, type.defaultValue()));
   }
 
-  public void putItemModifiers(ItemType type) {
-    for (var attribute : type.attributes()) {
-      getOrCreateAttribute(attribute.type())
+  public void putItemModifiers(SFItemStack itemStack, EquipmentSlot slot) {
+    var components = itemStack.components();
+    for (var modifier : components.get(DataComponentType.ATTRIBUTE_MODIFIERS).getModifiers()) {
+      if (isNotPartOf(modifier.getSlot(), slot)) {
+        continue;
+      }
+
+      getOrCreateAttribute(AttributeType.REGISTRY.getById(modifier.getAttribute()))
         .modifiers()
-        .putAll(
-          attribute.modifiers().stream()
-            .collect(Collectors.toMap(Attribute.Modifier::uuid, Function.identity())));
+        .put(modifier.getModifier().getId(), new Attribute.Modifier(modifier.getModifier().getId(), modifier.getModifier().getAmount(), switch (modifier.getModifier().getOperation()) {
+          case ADD -> ModifierOperation.ADD_VALUE;
+          case ADD_MULTIPLIED_BASE -> ModifierOperation.ADD_MULTIPLIED_BASE;
+          case ADD_MULTIPLIED_TOTAL -> ModifierOperation.ADD_MULTIPLIED_TOTAL;
+        }));
     }
   }
 
-  public void removeItemModifiers(ItemType type) {
-    for (var attribute : type.attributes()) {
-      for (var modifier : attribute.modifiers()) {
-        getOrCreateAttribute(attribute.type()).modifiers().remove(modifier.uuid());
+  public void removeItemModifiers(SFItemStack itemStack, EquipmentSlot slot) {
+    var components = itemStack.components();
+    for (var modifier : components.get(DataComponentType.ATTRIBUTE_MODIFIERS).getModifiers()) {
+      if (isNotPartOf(modifier.getSlot(), slot)) {
+        continue;
       }
+
+      getOrCreateAttribute(AttributeType.REGISTRY.getById(modifier.getAttribute()))
+        .modifiers()
+        .remove(modifier.getModifier().getId());
     }
   }
 }

@@ -25,7 +25,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 public class FluidsJavaGenerator implements IDataGenerator {
   @Override
   public String getDataName() {
-    return "FluidType.java";
+    return "java/FluidType.java";
   }
 
   @Override
@@ -39,11 +39,7 @@ public class FluidsJavaGenerator implements IDataGenerator {
           .map(
             s -> {
               var key = BuiltInRegistries.FLUID.getKey(s);
-              return "public static final FluidType "
-                + key.getPath().toUpperCase(Locale.ROOT)
-                + " = register(\""
-                + key
-                + "\");";
+              return "public static final FluidType %s = register(\"%s\");".formatted(key.getPath().toUpperCase(Locale.ROOT), key);
             })
           .toArray(String[]::new)));
   }

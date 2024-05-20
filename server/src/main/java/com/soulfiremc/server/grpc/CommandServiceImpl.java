@@ -17,15 +17,13 @@
  */
 package com.soulfiremc.server.grpc;
 
-import com.soulfiremc.brigadier.LocalConsole;
 import com.soulfiremc.grpc.generated.CommandCompletionRequest;
 import com.soulfiremc.grpc.generated.CommandCompletionResponse;
-import com.soulfiremc.grpc.generated.CommandHistoryRequest;
-import com.soulfiremc.grpc.generated.CommandHistoryResponse;
 import com.soulfiremc.grpc.generated.CommandRequest;
 import com.soulfiremc.grpc.generated.CommandResponse;
 import com.soulfiremc.grpc.generated.CommandServiceGrpc;
 import com.soulfiremc.server.ServerCommandManager;
+import com.soulfiremc.server.user.Permissions;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -41,10 +39,10 @@ public class CommandServiceImpl extends CommandServiceGrpc.CommandServiceImplBas
   @Override
   public void executeCommand(
     CommandRequest request, StreamObserver<CommandResponse> responseObserver) {
-    ServerRPCConstants.USER_CONTEXT_KEY.get().canAccessOrThrow(Resource.COMMAND_EXECUTION);
+    ServerRPCConstants.USER_CONTEXT_KEY.get().hasPermissionOrThrow(Permissions.COMMAND_EXECUTION);
 
     try {
-      var code = serverCommandManager.execute(request.getCommand(), new LocalConsole());
+      var code = serverCommandManager.execute(request.getCommand(), ServerRPCConstants.USER_CONTEXT_KEY.get());
 
       responseObserver.onNext(CommandResponse.newBuilder().setCode(code).build());
       responseObserver.onCompleted();
@@ -58,40 +56,16 @@ public class CommandServiceImpl extends CommandServiceGrpc.CommandServiceImplBas
   public void tabCompleteCommand(
     CommandCompletionRequest request,
     StreamObserver<CommandCompletionResponse> responseObserver) {
-    ServerRPCConstants.USER_CONTEXT_KEY.get().canAccessOrThrow(Resource.COMMAND_COMPLETION);
+    ServerRPCConstants.USER_CONTEXT_KEY.get().hasPermissionOrThrow(Permissions.COMMAND_COMPLETION);
 
     try {
-      var suggestions = serverCommandManager.getCompletionSuggestions(request.getCommand(), new LocalConsole());
+      var suggestions = serverCommandManager.getCompletionSuggestions(request.getCommand(), ServerRPCConstants.USER_CONTEXT_KEY.get());
 
       responseObserver.onNext(
         CommandCompletionResponse.newBuilder().addAllSuggestions(suggestions).build());
       responseObserver.onCompleted();
     } catch (Throwable t) {
       log.error("Error tab completing", t);
-      throw new StatusRuntimeException(Status.INTERNAL.withDescription(t.getMessage()).withCause(t));
-    }
-  }
-
-  @Override
-  public void getCommandHistory(
-    CommandHistoryRequest request, StreamObserver<CommandHistoryResponse> responseObserver) {
-    ServerRPCConstants.USER_CONTEXT_KEY.get().canAccessOrThrow(Resource.COMMAND_HISTORY);
-
-    try {
-      var history = serverCommandManager.getCommandHistory();
-      var builder = CommandHistoryResponse.newBuilder();
-      for (var entry : history) {
-        builder
-          .addEntriesBuilder()
-          .setTimestamp(entry.getKey().getEpochSecond())
-          .setCommand(entry.getValue())
-          .build();
-      }
-
-      responseObserver.onNext(builder.build());
-      responseObserver.onCompleted();
-    } catch (Throwable t) {
-      log.error("Error getting history", t);
       throw new StatusRuntimeException(Status.INTERNAL.withDescription(t.getMessage()).withCause(t));
     }
   }

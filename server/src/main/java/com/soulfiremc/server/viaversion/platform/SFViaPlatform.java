@@ -68,7 +68,7 @@ public class SFViaPlatform implements ViaPlatform<UserConnection> {
 
   public void init() {
     config =
-      new AbstractViaConfig(dataFolder.resolve("config.yml").toFile()) {
+      new AbstractViaConfig(dataFolder.resolve("config.yml").toFile(), logger) {
         private static final List<String> UNSUPPORTED =
           List.of(
             "checkforupdates",
@@ -215,7 +215,7 @@ public class SFViaPlatform implements ViaPlatform<UserConnection> {
     if (uuid == null) {
       this.getLogger().info(message);
     } else {
-      this.getLogger().info("[" + uuid + "] " + message);
+      this.getLogger().info("[%s] %s".formatted(uuid, message));
     }
   }
 

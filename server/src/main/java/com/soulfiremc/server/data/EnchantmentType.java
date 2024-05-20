@@ -17,29 +17,26 @@
  */
 package com.soulfiremc.server.data;
 
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.With;
+import net.kyori.adventure.key.Key;
 
 @SuppressWarnings("unused")
 @With(value = AccessLevel.PRIVATE)
 public record EnchantmentType(
   int id,
-  ResourceKey key,
+  Key key,
   int minLevel,
   int maxLevel,
-  List<String> incompatible,
-  String category,
-  String rarity,
+  List<Key> incompatible,
+  Key supportedItems,
   boolean tradeable,
   boolean discoverable,
   boolean curse,
   boolean treasureOnly,
-  List<EquipmentSlot> slots) {
-  public static final Object2ReferenceMap<ResourceKey, EnchantmentType> FROM_KEY =
-    new Object2ReferenceOpenHashMap<>();
+  List<EquipmentSlot> slots) implements RegistryValue<EnchantmentType> {
+  public static final Registry<EnchantmentType> REGISTRY = new Registry<>(RegistryKeys.ENCHANTMENT);
 
   //@formatter:off
   public static final EnchantmentType PROTECTION = register("minecraft:protection");
@@ -61,7 +58,7 @@ public record EnchantmentType(
   public static final EnchantmentType KNOCKBACK = register("minecraft:knockback");
   public static final EnchantmentType FIRE_ASPECT = register("minecraft:fire_aspect");
   public static final EnchantmentType LOOTING = register("minecraft:looting");
-  public static final EnchantmentType SWEEPING = register("minecraft:sweeping");
+  public static final EnchantmentType SWEEPING_EDGE = register("minecraft:sweeping_edge");
   public static final EnchantmentType EFFICIENCY = register("minecraft:efficiency");
   public static final EnchantmentType SILK_TOUCH = register("minecraft:silk_touch");
   public static final EnchantmentType UNBREAKING = register("minecraft:unbreaking");
@@ -79,6 +76,9 @@ public record EnchantmentType(
   public static final EnchantmentType MULTISHOT = register("minecraft:multishot");
   public static final EnchantmentType QUICK_CHARGE = register("minecraft:quick_charge");
   public static final EnchantmentType PIERCING = register("minecraft:piercing");
+  public static final EnchantmentType DENSITY = register("minecraft:density");
+  public static final EnchantmentType BREACH = register("minecraft:breach");
+  public static final EnchantmentType WIND_BURST = register("minecraft:wind_burst");
   public static final EnchantmentType MENDING = register("minecraft:mending");
   public static final EnchantmentType VANISHING_CURSE = register("minecraft:vanishing_curse");
   //@formatter:on
@@ -87,12 +87,7 @@ public record EnchantmentType(
     var instance =
       GsonDataHelper.fromJson("/minecraft/enchantments.json", key, EnchantmentType.class);
 
-    FROM_KEY.put(instance.key(), instance);
-    return instance;
-  }
-
-  public static EnchantmentType getByKey(ResourceKey key) {
-    return FROM_KEY.get(key);
+    return REGISTRY.register(instance);
   }
 
   @Override

@@ -34,8 +34,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class PathExecutor implements Consumer<BotPreTickEvent> {
+  private static final int MAX_ERROR_DISTANCE = 20;
   private final Queue<WorldAction> worldActionQueue = new LinkedBlockingQueue<>();
   private final BotConnection connection;
   private final Boolean2ObjectFunction<List<WorldAction>> findPath;
@@ -81,7 +84,7 @@ public class PathExecutor implements Consumer<BotPreTickEvent> {
         var routeFinder =
           new RouteFinder(new MinecraftGraph(dataManager.tagsState(), level, inventory, true, true), goalScorer);
 
-        logger.info("Starting calculations at: {}", start);
+        logger.info("Starting calculations at: {}", start.formatXYZ());
         var actions = routeFinder.findRoute(start, requiresRepositioning, pathCompletionFuture);
         logger.info("Calculated path with {} actions: {}", actions.size(), actions);
 
@@ -131,6 +134,7 @@ public class PathExecutor implements Consumer<BotPreTickEvent> {
         // Register again
         register();
       } catch (Throwable t) {
+        log.error("Error while calculating path", t);
         pathCompletionFuture.completeExceptionally(t);
       }
     });
@@ -140,6 +144,7 @@ public class PathExecutor implements Consumer<BotPreTickEvent> {
     this.worldActionQueue.clear();
     this.worldActionQueue.addAll(worldActions);
     this.totalMovements = worldActions.size();
+    this.movementNumber = 1;
   }
 
   @Override
@@ -173,6 +178,14 @@ public class PathExecutor implements Consumer<BotPreTickEvent> {
 
     if (ticks > 0 && ticks >= worldAction.getAllowedTicks()) {
       connection.logger().warn("Took too long to complete action: {}", worldAction);
+      connection.logger().warn("Recalculating path...");
+      recalculatePath();
+      return;
+    }
+
+    if (SFVec3i.fromDouble(connection.dataManager().clientEntity().pos())
+      .distance(worldAction.targetPosition(connection)) > MAX_ERROR_DISTANCE) {
+      connection.logger().warn("More than {} blocks away from target, this must be a mistake!", MAX_ERROR_DISTANCE);
       connection.logger().warn("Recalculating path...");
       recalculatePath();
       return;

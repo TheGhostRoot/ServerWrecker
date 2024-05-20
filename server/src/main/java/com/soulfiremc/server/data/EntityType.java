@@ -17,24 +17,24 @@
  */
 package com.soulfiremc.server.data;
 
-import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
+import net.kyori.adventure.key.Key;
 
 @SuppressWarnings("unused")
 public record EntityType(
   int id,
-  ResourceKey key,
+  Key key,
   float width,
   float height,
   String category,
   boolean friendly,
   boolean summonable,
-  boolean attackable) {
-  public static final Int2ReferenceMap<EntityType> FROM_ID = new Int2ReferenceOpenHashMap<>();
+  boolean attackable) implements RegistryValue<EntityType> {
+  public static final Registry<EntityType> REGISTRY = new Registry<>(RegistryKeys.ENTITY_TYPE);
 
   //@formatter:off
   public static final EntityType ALLAY = register("minecraft:allay");
   public static final EntityType AREA_EFFECT_CLOUD = register("minecraft:area_effect_cloud");
+  public static final EntityType ARMADILLO = register("minecraft:armadillo");
   public static final EntityType ARMOR_STAND = register("minecraft:armor_stand");
   public static final EntityType ARROW = register("minecraft:arrow");
   public static final EntityType AXOLOTL = register("minecraft:axolotl");
@@ -43,7 +43,9 @@ public record EntityType(
   public static final EntityType BLAZE = register("minecraft:blaze");
   public static final EntityType BLOCK_DISPLAY = register("minecraft:block_display");
   public static final EntityType BOAT = register("minecraft:boat");
+  public static final EntityType BOGGED = register("minecraft:bogged");
   public static final EntityType BREEZE = register("minecraft:breeze");
+  public static final EntityType BREEZE_WIND_CHARGE = register("minecraft:breeze_wind_charge");
   public static final EntityType CAMEL = register("minecraft:camel");
   public static final EntityType CAT = register("minecraft:cat");
   public static final EntityType CAVE_SPIDER = register("minecraft:cave_spider");
@@ -91,6 +93,7 @@ public record EntityType(
   public static final EntityType ITEM = register("minecraft:item");
   public static final EntityType ITEM_DISPLAY = register("minecraft:item_display");
   public static final EntityType ITEM_FRAME = register("minecraft:item_frame");
+  public static final EntityType OMINOUS_ITEM_SPAWNER = register("minecraft:ominous_item_spawner");
   public static final EntityType FIREBALL = register("minecraft:fireball");
   public static final EntityType LEASH_KNOT = register("minecraft:leash_knot");
   public static final EntityType LIGHTNING_BOLT = register("minecraft:lightning_bolt");
@@ -165,12 +168,7 @@ public record EntityType(
     var instance =
       GsonDataHelper.fromJson("/minecraft/entities.json", key, EntityType.class);
 
-    FROM_ID.put(instance.id(), instance);
-    return instance;
-  }
-
-  public static EntityType getById(int id) {
-    return FROM_ID.get(id);
+    return REGISTRY.register(instance);
   }
 
   @Override

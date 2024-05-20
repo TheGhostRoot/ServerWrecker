@@ -33,6 +33,8 @@ public class EffectsDataGenerator implements IDataGenerator {
       "key",
       Objects.requireNonNull(BuiltInRegistries.MOB_EFFECT.getKey(effect)).toString());
 
+    effectDesc.addProperty("category", effect.getCategory().name());
+
     if (effect.isBeneficial()) {
       effectDesc.addProperty("beneficial", true);
     }
@@ -46,7 +48,7 @@ public class EffectsDataGenerator implements IDataGenerator {
 
   @Override
   public String getDataName() {
-    return "effects.json";
+    return "data/effects.json";
   }
 
   @Override

@@ -26,6 +26,7 @@ task("runSFDedicated", JavaExec::class) {
 
   jvmArgs = listOf(
     "-Xmx2G",
+    "-XX:+EnableDynamicAgentLoading",
     "-XX:+UnlockExperimentalVMOptions",
     "-XX:+UseG1GC",
     "-XX:G1NewSizePercent=20",
@@ -33,6 +34,12 @@ task("runSFDedicated", JavaExec::class) {
     "-XX:MaxGCPauseMillis=50",
     "-XX:G1HeapRegionSize=32M"
   )
+
+  standardInput = System.`in`
+
+  val runDir = projectDir.resolve("run")
+  runDir.mkdirs()
+  workingDir = runDir
 
   outputs.upToDateWhen { false }
 }

@@ -17,14 +17,8 @@
  */
 package com.soulfiremc.brigadier;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
+public interface PlatformCommandManager<S extends CommandSource> {
+  int execute(String command, S source);
 
-public interface PlatformCommandManager {
-  int execute(String command, CommandSource source);
-
-  List<Map.Entry<Instant, String>> getCommandHistory();
-
-  Iterable<String> getCompletionSuggestions(String line, CommandSource source);
+  Iterable<String> getCompletionSuggestions(String line, S source);
 }

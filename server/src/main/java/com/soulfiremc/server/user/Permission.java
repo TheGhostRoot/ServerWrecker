@@ -15,7 +15,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.protocol.bot.model;
+package com.soulfiremc.server.user;
 
-public record DimensionData(
-  String dimensionType, String worldName, long hashedSeed, boolean debug, boolean flat) {}
+import java.util.ArrayList;
+import java.util.List;
+
+public record Permission(String id, String description) {
+  public static final List<Permission> VALUES = new ArrayList<>();
+
+  public Permission {
+    VALUES.add(this);
+  }
+}

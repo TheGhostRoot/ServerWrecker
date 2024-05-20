@@ -26,6 +26,7 @@ task("runSFClient", JavaExec::class) {
 
   jvmArgs = listOf(
     "-Xmx2G",
+    "-XX:+EnableDynamicAgentLoading",
     "-XX:+UnlockExperimentalVMOptions",
     "-XX:+UseG1GC",
     "-XX:G1NewSizePercent=20",
@@ -33,6 +34,8 @@ task("runSFClient", JavaExec::class) {
     "-XX:MaxGCPauseMillis=50",
     "-XX:G1HeapRegionSize=32M"
   )
+
+  standardInput = System.`in`
 
   outputs.upToDateWhen { false }
 }
@@ -46,6 +49,7 @@ task("runSFClientLocal", JavaExec::class) {
 
   jvmArgs = listOf(
     "-Xmx2G",
+    "-XX:+EnableDynamicAgentLoading",
     "-XX:+UnlockExperimentalVMOptions",
     "-XX:+UseG1GC",
     "-XX:G1NewSizePercent=20",
@@ -54,6 +58,8 @@ task("runSFClientLocal", JavaExec::class) {
     "-XX:G1HeapRegionSize=32M",
     "-Dsf.disableServerSelect=true"
   )
+
+  standardInput = System.`in`
 
   outputs.upToDateWhen { false }
 }

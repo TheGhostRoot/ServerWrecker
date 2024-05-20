@@ -15,6 +15,30 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.protocol.bot.nbt;
+package com.soulfiremc.server.spark;
 
-public sealed interface UniformOrInt permits MCUniform, MCUniformInt {}
+import com.soulfiremc.builddata.BuildData;
+import me.lucko.spark.common.platform.PlatformInfo;
+import org.geysermc.mcprotocollib.protocol.codec.MinecraftCodec;
+
+public class SFSparkPlatformInfo implements PlatformInfo {
+  @Override
+  public Type getType() {
+    return Type.CLIENT;
+  }
+
+  @Override
+  public String getName() {
+    return "SoulFire";
+  }
+
+  @Override
+  public String getVersion() {
+    return BuildData.VERSION;
+  }
+
+  @Override
+  public String getMinecraftVersion() {
+    return MinecraftCodec.CODEC.getMinecraftVersion();
+  }
+}

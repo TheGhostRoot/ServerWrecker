@@ -29,14 +29,14 @@ public enum MineableType {
   AXE(ItemTags.AXES, BlockTags.MINEABLE_WITH_AXE),
   HOE(ItemTags.HOES, BlockTags.MINEABLE_WITH_HOE);
 
-  public static MineableType[] VALUES = values();
-  private final ResourceKey itemTagKey;
+  public static final MineableType[] VALUES = values();
+  private final TagKey<ItemType> itemTagKey;
   @Getter
-  private final ResourceKey blockTagKey;
+  private final TagKey<BlockType> blockTagKey;
 
   public static Optional<MineableType> getFromTool(TagsState tagsState, ItemType itemType) {
     for (var mineableType : VALUES) {
-      if (tagsState.isItemInTag(itemType, mineableType.itemTagKey)) {
+      if (tagsState.isValueInTag(itemType, mineableType.itemTagKey)) {
         return Optional.of(mineableType);
       }
     }

@@ -21,21 +21,15 @@ import com.google.gson.JsonObject;
 import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import lombok.AccessLevel;
-import lombok.With;
+import net.kyori.adventure.key.Key;
 
 @SuppressWarnings("unused")
-@With(value = AccessLevel.PRIVATE)
 public record BlockType(
   int id,
-  ResourceKey key,
+  Key key,
   float destroyTime,
   float explosionResistance,
   boolean air,
@@ -45,7 +39,7 @@ public record BlockType(
   FluidType fluidType,
   List<LootPoolEntry> lootTableData,
   OffsetData offsetData,
-  BlockStates statesData) {
+  BlockStates statesData) implements RegistryValue<BlockType> {
   public static final TypeAdapter<FluidType> CUSTOM_FLUID_TYPE = new TypeAdapter<>() {
     @Override
     public void write(JsonWriter out, FluidType value) throws IOException {
@@ -54,40 +48,30 @@ public record BlockType(
 
     @Override
     public FluidType read(JsonReader in) throws IOException {
-      return FluidType.getByKey(ResourceKey.fromString(in.nextString()));
+      return FluidType.REGISTRY.getByKey(Key.key(in.nextString()));
     }
   };
-  public static final Int2ReferenceMap<BlockType> FROM_ID = new Int2ReferenceOpenHashMap<>();
-  public static final Object2ReferenceMap<ResourceKey, BlockType> FROM_KEY =
-    new Object2ReferenceOpenHashMap<>();
+  public static final Registry<BlockType> REGISTRY = new Registry<>(RegistryKeys.BLOCK);
 
   //@formatter:off
   // VALUES REPLACE
   //@formatter:on
+
+  public BlockType {
+    statesData = BlockStates.fromJsonArray(
+      this,
+      key,
+      GsonDataHelper.fromJson("/minecraft/blocks.json", key.toString(), JsonObject.class)
+        .getAsJsonArray("states"));
+  }
 
   public static BlockType register(String key) {
     var instance = GsonDataHelper.fromJson("/minecraft/blocks.json", key, BlockType.class, Map.of(
       FluidType.class,
       CUSTOM_FLUID_TYPE
     ));
-    instance =
-      instance.withStatesData(
-        BlockStates.fromJsonArray(
-          instance,
-          GsonDataHelper.fromJson("/minecraft/blocks.json", key, JsonObject.class)
-            .getAsJsonArray("states")));
 
-    FROM_ID.put(instance.id(), instance);
-    FROM_KEY.put(instance.key(), instance);
-    return instance;
-  }
-
-  public static BlockType getById(int id) {
-    return FROM_ID.get(id);
-  }
-
-  public static BlockType getByKey(ResourceKey key) {
-    return FROM_KEY.get(key);
+    return REGISTRY.register(instance);
   }
 
   @Override

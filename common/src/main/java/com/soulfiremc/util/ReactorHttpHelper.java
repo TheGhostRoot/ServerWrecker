@@ -41,6 +41,7 @@ public class ReactorHttpHelper {
     SFProxy proxyData, boolean withBody) {
     var base =
       HttpClient.create()
+        .compress(true)
         .responseTimeout(Duration.ofSeconds(5))
         .headers(
           h -> {
@@ -64,8 +65,7 @@ public class ReactorHttpHelper {
                 case SOCKS4 -> ProxyProvider.Proxy.SOCKS4;
                 case SOCKS5 -> ProxyProvider.Proxy.SOCKS5;
               })
-            .host(proxyData.host())
-            .port(proxyData.port())
+            .socketAddress(proxyData.address())
             .nonProxyHosts("localhost")
             .connectTimeoutMillis(20_000);
 
