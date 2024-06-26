@@ -34,7 +34,6 @@ import com.soulfiremc.server.plugins.AutoReconnect;
 import com.soulfiremc.server.plugins.AutoRegister;
 import com.soulfiremc.server.plugins.AutoRespawn;
 import com.soulfiremc.server.plugins.AutoTotem;
-import com.soulfiremc.server.plugins.BotTicker;
 import com.soulfiremc.server.plugins.ChatControl;
 import com.soulfiremc.server.plugins.ChatMessageLogger;
 import com.soulfiremc.server.plugins.ClientBrand;
@@ -62,6 +61,7 @@ import com.soulfiremc.server.viaversion.platform.SFViaBedrock;
 import com.soulfiremc.server.viaversion.platform.SFViaLegacy;
 import com.soulfiremc.server.viaversion.platform.SFViaPlatform;
 import com.soulfiremc.server.viaversion.platform.SFViaRewind;
+import com.soulfiremc.util.KeyHelper;
 import com.soulfiremc.util.SFFeatureFlags;
 import com.soulfiremc.util.SFPathConstants;
 import com.soulfiremc.util.ShutdownManager;
@@ -74,7 +74,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -86,7 +85,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -140,12 +138,7 @@ public class SoulFireServer {
 
     injector.register(ShutdownManager.class, shutdownManager);
 
-    try {
-      var keyGen = KeyGenerator.getInstance("HmacSHA256");
-      this.jwtSecretKey = keyGen.generateKey();
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
-    }
+    this.jwtSecretKey = KeyHelper.getOrCreateJWTSecretKey(SFPathConstants.getSecretKeyFile(baseDirectory));
 
     rpcServer = new RPCServer(host, port, injector, jwtSecretKey, authSystem);
     var rpcServerStart =
@@ -248,7 +241,6 @@ public class SoulFireServer {
   private static void registerInternalServerExtensions() {
     var plugins =
       new InternalPlugin[] {
-        new BotTicker(),
         new ClientBrand(),
         new ClientSettings(),
         new ChatControl(),
@@ -267,7 +259,7 @@ public class SoulFireServer {
           : null, // Needs to be before ForwardingBypass to not break it
         new ForwardingBypass(),
         new KillAura(),
-        SFFeatureFlags.POV_SERVER ? new POVServer() : null
+        new POVServer()
       };
 
     for (var plugin : plugins) {

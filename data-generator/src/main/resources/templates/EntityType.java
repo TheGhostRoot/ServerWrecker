@@ -25,6 +25,8 @@ public record EntityType(
   Key key,
   float width,
   float height,
+  int updateInterval,
+  int clientTrackingRange,
   String category,
   boolean friendly,
   boolean summonable,
@@ -37,7 +39,7 @@ public record EntityType(
 
   public static EntityType register(String key) {
     var instance =
-      GsonDataHelper.fromJson("/minecraft/entities.json", key, EntityType.class);
+      GsonDataHelper.fromJson("minecraft/entities.json", key, EntityType.class);
 
     return REGISTRY.register(instance);
   }

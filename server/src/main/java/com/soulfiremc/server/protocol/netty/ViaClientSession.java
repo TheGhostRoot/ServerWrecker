@@ -44,10 +44,10 @@ import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
 import io.netty.handler.traffic.GlobalTrafficShapingHandler;
 import java.net.Inet4Address;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
-import javax.crypto.SecretKey;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import net.raphimc.viabedrock.api.protocol.BedrockBaseProtocol;
@@ -67,6 +67,9 @@ import org.geysermc.mcprotocollib.network.crypt.PacketEncryption;
 import org.geysermc.mcprotocollib.network.event.session.PacketSendingEvent;
 import org.geysermc.mcprotocollib.network.packet.Packet;
 import org.geysermc.mcprotocollib.network.packet.PacketProtocol;
+import org.geysermc.mcprotocollib.network.tcp.TcpPacketCodec;
+import org.geysermc.mcprotocollib.network.tcp.TcpPacketCompression;
+import org.geysermc.mcprotocollib.network.tcp.TcpPacketEncryptor;
 import org.geysermc.mcprotocollib.network.tcp.TcpSession;
 import org.geysermc.mcprotocollib.protocol.codec.MinecraftCodecHelper;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundDelimiterPacket;
@@ -80,7 +83,7 @@ public class ViaClientSession extends TcpSession {
 
   @Getter
   private final Logger logger;
-  private final InetSocketAddress targetAddress;
+  private final SocketAddress targetAddress;
   private final String bindAddress;
   private final int bindPort;
   private final SFProxy proxy;
@@ -91,9 +94,10 @@ public class ViaClientSession extends TcpSession {
   private final BotConnection botConnection;
   private final Queue<Packet> packetTickQueue = new ConcurrentLinkedQueue<>();
   private boolean delimiterBlockProcessing = false;
+  private int threshold;
 
   public ViaClientSession(
-    InetSocketAddress targetAddress,
+    SocketAddress targetAddress,
     Logger logger,
     PacketProtocol protocol,
     SFProxy proxy,
@@ -108,6 +112,10 @@ public class ViaClientSession extends TcpSession {
     this.codecHelper = protocol.createHelper();
     this.eventLoopGroup = eventLoopGroup;
     this.botConnection = botConnection;
+  }
+
+  public boolean isDisconnected() {
+    return this.disconnected;
   }
 
   @Override
@@ -213,7 +221,7 @@ public class ViaClientSession extends TcpSession {
             // Inject Via codec
             pipeline.addLast("via-codec", new ViaCodec(userConnection));
 
-            pipeline.addLast("codec", new SFTcpPacketCodec(ViaClientSession.this));
+            pipeline.addLast("codec", new TcpPacketCodec(ViaClientSession.this, true));
             pipeline.addLast("manager", ViaClientSession.this);
 
             addHAProxySupport(pipeline);
@@ -241,11 +249,13 @@ public class ViaClientSession extends TcpSession {
 
   @Override
   public int getCompressionThreshold() {
-    throw new UnsupportedOperationException("Not supported method.");
+    return threshold;
   }
 
-  public void setCompressionThreshold(int threshold) {
+  @Override
+  public void setCompressionThreshold(int threshold, boolean validateDecompression) {
     logger.debug("Enabling compression with threshold {}", threshold);
+    this.threshold = threshold;
 
     var channel = getChannel();
     if (channel == null) {
@@ -257,9 +267,7 @@ public class ViaClientSession extends TcpSession {
       if (handler == null) {
         channel
           .pipeline()
-          .addBefore("via-codec", COMPRESSION_NAME, new CompressionCodec(threshold));
-      } else {
-        ((CompressionCodec) handler).threshold(threshold);
+          .addBefore("via-codec", COMPRESSION_NAME, new TcpPacketCompression(this, validateDecompression));
       }
     } else if (channel.pipeline().get(COMPRESSION_NAME) != null) {
       channel.pipeline().remove(COMPRESSION_NAME);
@@ -267,13 +275,17 @@ public class ViaClientSession extends TcpSession {
   }
 
   @Override
-  public void setCompressionThreshold(int threshold, boolean validateDecompression) {
-    throw new UnsupportedOperationException("Not supported method.");
-  }
-
-  @Override
   public void enableEncryption(PacketEncryption encryption) {
-    throw new UnsupportedOperationException("Not supported method.");
+    var pipeline = getChannel().pipeline();
+    var encryptor = new TcpPacketEncryptor(encryption);
+
+    if (pipeline.get("vl-prenetty") != null) {
+      logger.debug("Enabling legacy decryption");
+      pipeline.addBefore("vl-prenetty", ENCRYPTION_NAME, encryptor);
+    } else {
+      logger.debug("Enabling decryption");
+      pipeline.addBefore(SIZER_NAME, ENCRYPTION_NAME, encryptor);
+    }
   }
 
   @Override
@@ -326,7 +338,7 @@ public class ViaClientSession extends TcpSession {
 
   @Override
   public void callPacketReceived(Packet packet) {
-    if (packet.isPriority()) {
+    if (packet.isTerminal()) {
       super.callPacketReceived(packet);
       return;
     }
@@ -335,7 +347,7 @@ public class ViaClientSession extends TcpSession {
       // Block or unlock packets for processing
       delimiterBlockProcessing = !delimiterBlockProcessing;
     } else {
-      packetTickQueue.add(packet);
+      super.callPacketReceived(packet);
     }
   }
 
@@ -352,7 +364,7 @@ public class ViaClientSession extends TcpSession {
   }
 
   @Override
-  public void send(Packet packet) {
+  public void send(Packet packet, Runnable onSent) {
     var channel = getChannel();
     if (channel == null || !channel.isActive() || eventLoopGroup.isShutdown()) {
       return;
@@ -373,6 +385,10 @@ public class ViaClientSession extends TcpSession {
         (ChannelFutureListener)
           future -> {
             if (future.isSuccess()) {
+              if (onSent != null) {
+                onSent.run();
+              }
+
               callPacketSent(toSend);
             } else {
               packetExceptionCaught(null, future.cause(), packet);
@@ -394,18 +410,5 @@ public class ViaClientSession extends TcpSession {
     super.exceptionCaught(ctx, cause);
 
     logger.debug("Exception caught in Netty session.", cause);
-  }
-
-  public void enableJavaEncryption(SecretKey key) {
-    var codec = new CryptoCodec(key, key);
-    var pipeline = getChannel().pipeline();
-
-    if (pipeline.get("vl-prenetty") != null) {
-      logger.debug("Enabling legacy decryption");
-      pipeline.addBefore("vl-prenetty", ENCRYPTION_NAME, codec);
-    } else {
-      logger.debug("Enabling decryption");
-      pipeline.addBefore(SIZER_NAME, ENCRYPTION_NAME, codec);
-    }
   }
 }

@@ -39,7 +39,7 @@ public class ChatControl implements InternalPlugin {
       return;
     }
 
-    var plainMessage = event.parseToText();
+    var plainMessage = event.parseToPlainText();
     var prefix = settingsHolder.get(ChatControlSettings.COMMAND_PREFIX);
 
     if (plainMessage.startsWith(prefix)) {
@@ -72,7 +72,7 @@ public class ChatControl implements InternalPlugin {
     public static final BooleanProperty ENABLED =
       BUILDER.ofBoolean(
         "enabled",
-        "Enable controlling the bot with chat messages",
+        "Enable Chat Control",
         new String[] {"--chat-control"},
         "Enable controlling the bot with chat messages",
         false);

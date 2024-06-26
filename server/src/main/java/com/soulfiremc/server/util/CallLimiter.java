@@ -15,27 +15,29 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.protocol.bot.state;
+package com.soulfiremc.server.util;
 
-import com.soulfiremc.server.data.Registry;
-import com.soulfiremc.server.data.RegistryValue;
-import lombok.Getter;
-import net.kyori.adventure.key.Key;
-import org.cloudburstmc.nbt.NbtMap;
+import java.util.concurrent.TimeUnit;
 
-@Getter
-public class Biome implements RegistryValue<Biome> {
-  private final Registry<Biome> registry;
-  private final Key key;
-  private final int id;
-  private final float temperature;
-  private final float downfall;
+/**
+ * A class that only allows a call to be made once in a given interval.
+ */
+public class CallLimiter implements Runnable {
+  private final Runnable c;
+  private final long interval;
+  private volatile long lastCalled;
 
-  public Biome(Registry<Biome> registry, Key key, int id, NbtMap biomeData) {
-    this.registry = registry;
-    this.key = key;
-    this.id = id;
-    this.temperature = biomeData.getFloat("temperature");
-    this.downfall = biomeData.getFloat("downfall");
+  public CallLimiter(Runnable c, long interval, TimeUnit unit) {
+    this.c = c;
+    this.interval = unit.toMillis(interval);
+  }
+
+  @Override
+  public void run() {
+    if (lastCalled + interval < System.currentTimeMillis()) {
+      lastCalled = System.currentTimeMillis();
+      c.run();
+    }
   }
 }
+

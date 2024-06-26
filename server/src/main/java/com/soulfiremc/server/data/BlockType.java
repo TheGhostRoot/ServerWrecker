@@ -43,9 +43,10 @@ public record BlockType(
   public static final TypeAdapter<FluidType> CUSTOM_FLUID_TYPE = new TypeAdapter<>() {
     @Override
     public void write(JsonWriter out, FluidType value) throws IOException {
-      out.value(value.key().toString());
+      out.value(value.key().asString());
     }
 
+    @SuppressWarnings("PatternValidation")
     @Override
     public FluidType read(JsonReader in) throws IOException {
       return FluidType.REGISTRY.getByKey(Key.key(in.nextString()));
@@ -1102,8 +1103,8 @@ public record BlockType(
   public static final BlockType RAW_IRON_BLOCK = register("minecraft:raw_iron_block");
   public static final BlockType RAW_COPPER_BLOCK = register("minecraft:raw_copper_block");
   public static final BlockType RAW_GOLD_BLOCK = register("minecraft:raw_gold_block");
-  public static final BlockType POTTED_AZALEA_BUSH = register("minecraft:potted_azalea_bush");
-  public static final BlockType POTTED_FLOWERING_AZALEA_BUSH = register("minecraft:potted_flowering_azalea_bush");
+  public static final BlockType POTTED_AZALEA = register("minecraft:potted_azalea_bush");
+  public static final BlockType POTTED_FLOWERING_AZALEA = register("minecraft:potted_flowering_azalea_bush");
   public static final BlockType OCHRE_FROGLIGHT = register("minecraft:ochre_froglight");
   public static final BlockType VERDANT_FROGLIGHT = register("minecraft:verdant_froglight");
   public static final BlockType PEARLESCENT_FROGLIGHT = register("minecraft:pearlescent_froglight");
@@ -1120,12 +1121,12 @@ public record BlockType(
     statesData = BlockStates.fromJsonArray(
       this,
       key,
-      GsonDataHelper.fromJson("/minecraft/blocks.json", key.toString(), JsonObject.class)
+      GsonDataHelper.fromJson("minecraft/blocks.json", key.toString(), JsonObject.class)
         .getAsJsonArray("states"));
   }
 
   public static BlockType register(String key) {
-    var instance = GsonDataHelper.fromJson("/minecraft/blocks.json", key, BlockType.class, Map.of(
+    var instance = GsonDataHelper.fromJson("minecraft/blocks.json", key, BlockType.class, Map.of(
       FluidType.class,
       CUSTOM_FLUID_TYPE
     ));

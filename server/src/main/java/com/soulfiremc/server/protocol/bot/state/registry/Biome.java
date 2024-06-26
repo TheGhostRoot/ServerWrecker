@@ -15,20 +15,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.soulfiremc.server.pathfinding;
+package com.soulfiremc.server.protocol.bot.state.registry;
 
-import com.soulfiremc.server.pathfinding.graph.ProjectedInventory;
-import com.soulfiremc.server.pathfinding.graph.ProjectedLevel;
+import com.soulfiremc.server.data.RegistryValue;
+import lombok.Getter;
+import net.kyori.adventure.key.Key;
+import org.cloudburstmc.nbt.NbtMap;
 
-/**
- * Represents the state of the bot in the level. This means the positions and in the future also
- * inventory.
- *
- * @param blockPosition The position of the bot in block coordinates. This is the block the bottom
- *                      of the bot is in, so the "feet" block.
- * @param level         The level state of the world the bot is in.
- * @param inventory     The inventory state of the bot.
- */
-public record BotEntityState(
-  SFVec3i blockPosition, ProjectedLevel level, ProjectedInventory inventory) {
+@Getter
+public class Biome implements RegistryValue<Biome> {
+  private final Key key;
+  private final int id;
+  private final float temperature;
+  private final float downfall;
+
+  public Biome(Key key, int id, NbtMap biomeData) {
+    this.key = key;
+    this.id = id;
+    this.temperature = biomeData.getFloat("temperature");
+    this.downfall = biomeData.getFloat("downfall");
+  }
 }

@@ -19,7 +19,7 @@ package com.soulfiremc.server.plugins;
 
 import com.soulfiremc.server.api.PluginHelper;
 import com.soulfiremc.server.api.SoulFireAPI;
-import com.soulfiremc.server.api.event.bot.SFPacketSentEvent;
+import com.soulfiremc.server.api.event.bot.SFPacketReceiveEvent;
 import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
 import com.soulfiremc.server.protocol.SFProtocolConstants;
 import com.soulfiremc.server.settings.lib.SettingsObject;
@@ -32,11 +32,11 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import net.lenni0451.lambdaevents.EventHandler;
 import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundCustomPayloadPacket;
-import org.geysermc.mcprotocollib.protocol.packet.login.serverbound.ServerboundLoginAcknowledgedPacket;
+import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundGameProfilePacket;
 
 public class ClientBrand implements InternalPlugin {
-  public static void onPacket(SFPacketSentEvent event) {
-    if (event.packet() instanceof ServerboundLoginAcknowledgedPacket) {
+  public static void onPacket(SFPacketReceiveEvent event) {
+    if (event.packet() instanceof ClientboundGameProfilePacket) {
       var connection = event.connection();
       var settingsHolder = connection.settingsHolder();
 
@@ -52,8 +52,7 @@ public class ClientBrand implements InternalPlugin {
 
       connection
         .session()
-        .send(new ServerboundCustomPayloadPacket(SFProtocolConstants.BRAND_PAYLOAD_KEY.toString(),
-          ByteBufUtil.getBytes(buf)));
+        .send(new ServerboundCustomPayloadPacket(SFProtocolConstants.BRAND_PAYLOAD_KEY, ByteBufUtil.getBytes(buf)));
     }
   }
 
@@ -65,7 +64,7 @@ public class ClientBrand implements InternalPlugin {
   @Override
   public void onLoad() {
     SoulFireAPI.registerListeners(ClientBrand.class);
-    PluginHelper.registerBotEventConsumer(SFPacketSentEvent.class, ClientBrand::onPacket);
+    PluginHelper.registerBotEventConsumer(SFPacketReceiveEvent.class, ClientBrand::onPacket);
   }
 
   @NoArgsConstructor(access = AccessLevel.PRIVATE)

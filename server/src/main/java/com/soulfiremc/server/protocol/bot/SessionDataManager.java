@@ -46,9 +46,7 @@ import com.soulfiremc.server.protocol.bot.model.HealthData;
 import com.soulfiremc.server.protocol.bot.model.LoginPacketData;
 import com.soulfiremc.server.protocol.bot.model.ServerPlayData;
 import com.soulfiremc.server.protocol.bot.movement.ControlState;
-import com.soulfiremc.server.protocol.bot.state.Biome;
 import com.soulfiremc.server.protocol.bot.state.BorderState;
-import com.soulfiremc.server.protocol.bot.state.DimensionType;
 import com.soulfiremc.server.protocol.bot.state.EntityTrackerState;
 import com.soulfiremc.server.protocol.bot.state.Level;
 import com.soulfiremc.server.protocol.bot.state.MapDataState;
@@ -59,8 +57,12 @@ import com.soulfiremc.server.protocol.bot.state.WeatherState;
 import com.soulfiremc.server.protocol.bot.state.entity.ClientEntity;
 import com.soulfiremc.server.protocol.bot.state.entity.ExperienceOrbEntity;
 import com.soulfiremc.server.protocol.bot.state.entity.RawEntity;
+import com.soulfiremc.server.protocol.bot.state.registry.Biome;
+import com.soulfiremc.server.protocol.bot.state.registry.DimensionType;
+import com.soulfiremc.server.protocol.bot.state.registry.SFChatType;
 import com.soulfiremc.server.settings.lib.SettingsHolder;
 import com.soulfiremc.server.util.PrimitiveHelper;
+import com.soulfiremc.server.util.TickTimer;
 import com.soulfiremc.server.viaversion.SFVersionConstants;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -72,8 +74,10 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -88,8 +92,11 @@ import org.geysermc.mcprotocollib.network.event.session.DisconnectedEvent;
 import org.geysermc.mcprotocollib.protocol.codec.MinecraftCodecHelper;
 import org.geysermc.mcprotocollib.protocol.data.UnexpectedEncryptionException;
 import org.geysermc.mcprotocollib.protocol.data.game.ClientCommand;
+import org.geysermc.mcprotocollib.protocol.data.game.Holder;
 import org.geysermc.mcprotocollib.protocol.data.game.KnownPack;
+import org.geysermc.mcprotocollib.protocol.data.game.RegistryEntry;
 import org.geysermc.mcprotocollib.protocol.data.game.ResourcePackStatus;
+import org.geysermc.mcprotocollib.protocol.data.game.chat.ChatType;
 import org.geysermc.mcprotocollib.protocol.data.game.chunk.ChunkSection;
 import org.geysermc.mcprotocollib.protocol.data.game.chunk.palette.PaletteType;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.GlobalPos;
@@ -107,6 +114,7 @@ import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.Clientbound
 import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundResourcePackPacket;
 import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundRegistryDataPacket;
 import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundSelectKnownPacks;
+import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundUpdateEnabledFeaturesPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundChangeDifficultyPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundCooldownPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundDisguisedChatPacket;
@@ -118,6 +126,8 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.Clientbound
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundServerDataPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundSystemChatPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundTabListPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundTickingStatePacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundTickingStepPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundEntityEventPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundMoveEntityPosPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundMoveEntityPosRotPacket;
@@ -170,7 +180,6 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.level.Serve
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundMovePlayerPosRotPacket;
 import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundGameProfilePacket;
 import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundLoginDisconnectPacket;
-import org.intellij.lang.annotations.Subst;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -185,14 +194,17 @@ public final class SessionDataManager {
   private final WeatherState weatherState = new WeatherState();
   private final PlayerListState playerListState = new PlayerListState();
   private final Int2IntMap itemCoolDowns = Int2IntMaps.synchronize(new Int2IntOpenHashMap());
-  private final Registry<DimensionType> dimensions = new Registry<>(RegistryKeys.DIMENSION_TYPE);
-  private final Registry<Biome> biomes = new Registry<>(RegistryKeys.BIOME);
+  private final Map<ResourceKey<?>, List<RegistryEntry>> rawRegistryData = new HashMap<>();
+  private final Registry<DimensionType> dimensionTypeRegistry = new Registry<>(RegistryKeys.DIMENSION_TYPE);
+  private final Registry<Biome> biomeRegistry = new Registry<>(RegistryKeys.BIOME);
+  private final Registry<SFChatType> chatTypeRegistry = new Registry<>(RegistryKeys.CHAT_TYPE);
   private final Int2ObjectMap<MapDataState> mapDataStates = new Int2ObjectOpenHashMap<>();
   private final EntityTrackerState entityTrackerState = new EntityTrackerState();
   private final InventoryManager inventoryManager;
   private final BotActionManager botActionManager;
   private final ControlState controlState = new ControlState();
   private final TagsState tagsState = new TagsState();
+  private Key[] serverEnabledFeatures;
   private List<KnownPack> serverKnownPacks;
   private ClientEntity clientEntity;
   private @Nullable ServerPlayData serverPlayData;
@@ -204,7 +216,8 @@ public final class SessionDataManager {
   private LoginPacketData loginData;
   private boolean enableRespawnScreen;
   private boolean doLimitedCrafting;
-  private Level lastSpawnedInLevel;
+  private Level level;
+  private final TickTimer tickTimer = new TickTimer(20.0F, 0L, this::getTickTargetMillis);
   private int serverViewDistance = -1;
   private int serverSimulationDistance = -1;
   private @Nullable GlobalPos lastDeathPos;
@@ -245,6 +258,17 @@ public final class SessionDataManager {
     return list;
   }
 
+  private float getTickTargetMillis(float defaultValue) {
+    if (this.level != null) {
+      var lv = this.level.tickRateManager();
+      if (lv.runsNormally()) {
+        return Math.max(defaultValue, lv.millisecondsPerTick());
+      }
+    }
+
+    return defaultValue;
+  }
+
   @EventHandler
   public void onLoginSuccess(ClientboundGameProfilePacket packet) {
     botProfile = packet.getProfile();
@@ -256,14 +280,23 @@ public final class SessionDataManager {
   }
 
   @EventHandler
+  public void onUpdateEnabledFeatures(ClientboundUpdateEnabledFeaturesPacket packet) {
+    serverEnabledFeatures = packet.getFeatures();
+  }
+
+  @EventHandler
   public void onRegistry(ClientboundRegistryDataPacket packet) {
-    @Subst("empty") var registry = packet.getRegistry();
+    var registry = packet.getRegistry();
     var registryKey = ResourceKey.key(registry);
+    rawRegistryData.put(registryKey, packet.getEntries());
+
     Registry.RegistryDataWriter registryWriter;
     if (registryKey.equals(RegistryKeys.DIMENSION_TYPE)) {
-      registryWriter = dimensions.writer(DimensionType::new);
+      registryWriter = dimensionTypeRegistry.writer(DimensionType::new);
     } else if (registryKey.equals(RegistryKeys.BIOME)) {
-      registryWriter = biomes.writer(Biome::new);
+      registryWriter = biomeRegistry.writer(Biome::new);
+    } else if (registryKey.equals(RegistryKeys.CHAT_TYPE)) {
+      registryWriter = chatTypeRegistry.writer(SFChatType::new);
     } else {
       log.debug("Received registry data for unknown registry {}", registryKey);
       return;
@@ -272,8 +305,7 @@ public final class SessionDataManager {
     var entries = packet.getEntries();
     for (var i = 0; i < entries.size(); i++) {
       var entry = entries.get(i);
-      @Subst("empty") var key = entry.getId();
-      var holderKey = Key.key(key);
+      var holderKey = entry.getId();
       var providedData = entry.getData();
       NbtMap usedData;
       if (providedData == null) {
@@ -307,11 +339,11 @@ public final class SessionDataManager {
   }
 
   private void processSpawnInfo(PlayerSpawnInfo spawnInfo) {
-    lastSpawnedInLevel =
+    level =
       new Level(
         tagsState,
-        dimensions.getById(spawnInfo.getDimension()),
-        Key.key(spawnInfo.getWorldName()),
+        dimensionTypeRegistry.getById(spawnInfo.getDimension()),
+        spawnInfo.getWorldName(),
         spawnInfo.getHashedSeed(),
         spawnInfo.isDebug(),
         spawnInfo.isFlat());
@@ -319,6 +351,25 @@ public final class SessionDataManager {
     previousGameMode = spawnInfo.getPreviousGamemode();
     lastDeathPos = spawnInfo.getLastDeathPos();
     portalCooldown = spawnInfo.getPortalCooldown();
+  }
+
+  @EventHandler
+  public void onTickingState(ClientboundTickingStatePacket packet) {
+    if (this.level != null) {
+      var tickRateManager = level.tickRateManager();
+
+      tickRateManager.setTickRate(packet.getTickRate());
+      tickRateManager.setFrozen(packet.isFrozen());
+    }
+  }
+
+  @EventHandler
+  public void onTickingStep(ClientboundTickingStepPacket packet) {
+    if (this.level != null) {
+      var tickRateManager = level.tickRateManager();
+
+      tickRateManager.setFrozenTicksToRun(packet.getTickSteps());
+    }
   }
 
   @EventHandler
@@ -408,7 +459,7 @@ public final class SessionDataManager {
 
   @EventHandler
   public void onPluginMessage(ClientboundCustomPayloadPacket packet) {
-    var channelKey = Key.key(packet.getChannel());
+    var channelKey = packet.getChannel();
     log.debug("Received plugin message on channel {}", channelKey);
     if (channelKey.equals(SFProtocolConstants.BRAND_PAYLOAD_KEY)) {
       serverBrand = codecHelper.readString(Unpooled.wrappedBuffer(packet.getData()));
@@ -425,15 +476,11 @@ public final class SessionDataManager {
 
   @EventHandler
   public void onPlayerChat(ClientboundPlayerChatPacket packet) {
-    var message = packet.getUnsignedContent();
-    if (message != null) {
-      onChat(packet.getTimeStamp(), message);
-      return;
-    }
-
-    var sender = ChatMessageReceiveEvent.ChatMessageSender.fromClientboundPlayerChatPacket(packet);
-
-    onChat(packet.getTimeStamp(), Component.text(packet.getContent()), sender);
+    onChat(packet.getTimeStamp(), prepareChatTypeMessage(packet.getChatType(), new SFChatType.BoundChatMessageInfo(
+      getComponentForPlayerChat(packet),
+      packet.getName(),
+      packet.getTargetName()
+    )));
   }
 
   @EventHandler
@@ -442,15 +489,24 @@ public final class SessionDataManager {
   }
 
   @EventHandler
-  public void onDisguisedChat(ClientboundDisguisedChatPacket packet) {}
-
-  private void onChat(long stamp, Component message) {
-    connection.eventBus().call(new ChatMessageReceiveEvent(connection, stamp, message, null));
+  public void onDisguisedChat(ClientboundDisguisedChatPacket packet) {
+    onChat(System.currentTimeMillis(), prepareChatTypeMessage(packet.getChatType(), new SFChatType.BoundChatMessageInfo(
+      packet.getMessage(),
+      packet.getName(),
+      packet.getTargetName()
+    )));
   }
 
-  private void onChat(
-    long stamp, Component message, ChatMessageReceiveEvent.ChatMessageSender sender) {
-    connection.eventBus().call(new ChatMessageReceiveEvent(connection, stamp, message, sender));
+  public Component getComponentForPlayerChat(ClientboundPlayerChatPacket packet) {
+    return Objects.requireNonNullElseGet(packet.getUnsignedContent(), () -> Component.text(packet.getContent()));
+  }
+
+  public Component prepareChatTypeMessage(Holder<ChatType> chatTypeHolder, SFChatType.BoundChatMessageInfo chatInfo) {
+    return SFChatType.buildChatComponent(chatTypeHolder.getOrCompute(id -> chatTypeRegistry.getById(id).mcplChatType()), chatInfo);
+  }
+
+  private void onChat(long stamp, Component message) {
+    connection.eventBus().call(new ChatMessageReceiveEvent(connection, stamp, message));
   }
 
   @EventHandler
@@ -516,10 +572,10 @@ public final class SessionDataManager {
 
     var attributeState = clientEntity.attributeState();
     attributeState
-      .getOrCreateAttribute(AttributeType.GENERIC_MOVEMENT_SPEED)
+      .getOrCreateAttribute(AttributeType.MOVEMENT_SPEED)
       .baseValue(abilitiesData.walkSpeed());
     attributeState
-      .getOrCreateAttribute(AttributeType.GENERIC_FLYING_SPEED)
+      .getOrCreateAttribute(AttributeType.FLYING_SPEED)
       .baseValue(abilitiesData.flySpeed());
 
     controlState.flying(abilitiesData.flying());
@@ -863,7 +919,7 @@ public final class SessionDataManager {
     }
 
     for (var entry : packet.getAttributes()) {
-      var key = Key.key(entry.getType().getIdentifier());
+      var key = entry.getType().getIdentifier();
       var attributeType = AttributeType.REGISTRY.getByKey(key);
       if (attributeType == null) {
         log.warn("Received unknown attribute type {}", key);
@@ -881,14 +937,14 @@ public final class SessionDataManager {
             .map(
               modifier ->
                 new Attribute.Modifier(
-                  modifier.getUuid(),
+                  modifier.getId(),
                   modifier.getAmount(),
                   switch (modifier.getOperation()) {
                     case ADD -> ModifierOperation.ADD_VALUE;
                     case ADD_MULTIPLIED_BASE -> ModifierOperation.ADD_MULTIPLIED_BASE;
                     case ADD_MULTIPLIED_TOTAL -> ModifierOperation.ADD_MULTIPLIED_TOTAL;
                   }))
-            .collect(Collectors.toMap(Attribute.Modifier::uuid, Function.identity())));
+            .collect(Collectors.toMap(Attribute.Modifier::id, Function.identity())));
     }
   }
 
@@ -1068,14 +1124,12 @@ public final class SessionDataManager {
     }
 
     if (cause.getClass() == UnexpectedEncryptionException.class) {
-      log.error("Server is online mode!");
+      log.error("Server is online mode!", cause);
     } else if (reason.contains("Connection refused")) {
-      log.error("Server is not reachable!");
+      log.error("Server is not reachable!", cause);
     } else {
-      log.error("Disconnected: {}", reason);
+      log.error("Disconnected: {}", reason, cause);
     }
-
-    log.error("Cause: {}", cause.getMessage());
   }
 
   private void handleTips(String message) {
@@ -1087,10 +1141,14 @@ public final class SessionDataManager {
   }
 
   public @NotNull Level currentLevel() {
-    return Objects.requireNonNull(lastSpawnedInLevel, "Current level is not set");
+    return Objects.requireNonNull(level, "Current level is not set");
   }
 
   public void tick() {
+    if (this.level != null) {
+      this.level.tickRateManager().tick();
+    }
+
     // Tick border changes
     if (borderState != null) {
       borderState.tick();

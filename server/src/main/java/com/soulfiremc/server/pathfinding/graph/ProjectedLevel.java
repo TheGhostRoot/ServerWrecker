@@ -18,10 +18,9 @@
 package com.soulfiremc.server.pathfinding.graph;
 
 import com.soulfiremc.server.data.BlockState;
-import com.soulfiremc.server.pathfinding.Costs;
 import com.soulfiremc.server.pathfinding.SFVec3i;
 import com.soulfiremc.server.protocol.bot.block.BlockAccessor;
-import com.soulfiremc.server.util.Vec2ObjectOpenHashMap;
+import com.soulfiremc.server.protocol.bot.state.LevelHeightAccessor;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 
@@ -32,44 +31,14 @@ import lombok.ToString;
 @ToString(onlyExplicitlyIncluded = true)
 @RequiredArgsConstructor
 public class ProjectedLevel {
-  private final BlockAccessor accessor;
-  @ToString.Include
-  private final Vec2ObjectOpenHashMap<SFVec3i, BlockState> blockChanges;
-
-  public ProjectedLevel(BlockAccessor accessor) {
-    this(accessor, new Vec2ObjectOpenHashMap<>());
-  }
-
-  public ProjectedLevel withChangeToSolidBlock(SFVec3i position) {
-    var blockChanges = this.blockChanges.clone();
-    blockChanges.put(position, Costs.SOLID_PLACED_BLOCK_STATE);
-
-    return new ProjectedLevel(accessor, blockChanges);
-  }
-
-  public ProjectedLevel withChangeToAir(SFVec3i position) {
-    var blockChanges = this.blockChanges.clone();
-    blockChanges.put(position, Costs.AIR_BLOCK_STATE);
-
-    return new ProjectedLevel(accessor, blockChanges);
-  }
+  private final LevelHeightAccessor levelHeightAccessor;
+  private final BlockAccessor blockAccessor;
 
   public BlockState getBlockState(SFVec3i position) {
-    var blockChange = blockChanges.get(position);
-    if (blockChange != null) {
-      return blockChange;
-    }
-
-    return accessor.getBlockState(position.x, position.y, position.z);
+    return blockAccessor.getBlockState(position.x, position.y, position.z);
   }
 
   public boolean isPlaceable(SFVec3i position) {
-    var minBuildHeight = accessor.minBuildHeight();
-    if (minBuildHeight.isPresent() && position.y < minBuildHeight.getAsInt()) {
-      return false;
-    }
-
-    var maxBuildHeight = accessor.maxBuildHeight();
-    return maxBuildHeight.isEmpty() || position.y < maxBuildHeight.getAsInt();
+    return !levelHeightAccessor.isOutsideBuildHeight(position.y);
   }
 }

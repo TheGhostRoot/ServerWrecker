@@ -20,7 +20,9 @@ package com.soulfiremc.server.protocol.bot.state;
 import com.soulfiremc.server.data.BlockState;
 import com.soulfiremc.server.pathfinding.SFVec3i;
 import com.soulfiremc.server.protocol.bot.movement.AABB;
+import com.soulfiremc.server.protocol.bot.state.registry.DimensionType;
 import com.soulfiremc.server.util.MathHelper;
+import com.soulfiremc.server.util.TickRateManager;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
@@ -29,7 +31,8 @@ import net.kyori.adventure.key.Key;
 import org.cloudburstmc.math.vector.Vector3i;
 
 @Getter
-public class Level {
+public class Level implements LevelHeightAccessor {
+  private final TickRateManager tickRateManager = new TickRateManager();
   private final TagsState tagsState;
   private final ChunkHolder chunks;
   private final DimensionType dimensionType;
@@ -57,22 +60,24 @@ public class Level {
     this.debug = debug;
     this.flat = flat;
 
-    this.chunks = new ChunkHolder(getMinBuildHeight(), getMaxBuildHeight());
+    this.chunks = new ChunkHolder(this);
   }
 
+  @Override
+  public int getHeight() {
+    return dimensionType.height();
+  }
+
+  @Override
   public int getMinBuildHeight() {
     return dimensionType.minY();
   }
 
-  public int getMaxBuildHeight() {
-    return this.getMinBuildHeight() + dimensionType.height();
+  public void setBlock(Vector3i block, BlockState state) {
+    setBlockId(block, state.id());
   }
 
-  public boolean isOutSideBuildHeight(double y) {
-    return y < this.getMinBuildHeight() || y >= this.getMaxBuildHeight();
-  }
-
-  public void setBlockId(Vector3i block, int state) {
+  public void setBlockId(Vector3i block, int stateId) {
     var chunkData = chunks.getChunk(block);
 
     // Ignore block updates for unloaded chunks; that's what vanilla does.
@@ -80,7 +85,7 @@ public class Level {
       return;
     }
 
-    chunkData.setBlock(block, state);
+    chunkData.setBlock(block, stateId);
   }
 
   public boolean isChunkLoaded(Vector3i block) {

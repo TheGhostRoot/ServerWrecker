@@ -14,16 +14,15 @@ repositories {
 
 dependencies {
   implementation("org.vineflower:vineflower:1.10.1")
-  implementation("com.github.javaparser:javaparser-symbol-solver-core:3.25.10")
+  implementation("com.github.javaparser:javaparser-symbol-solver-core:3.26.1")
 }
 
 unimined.minecraft {
-  version("1.20.6")
+  version("1.21")
 
   mappings {
     intermediary()
     mojmap()
-    parchment("1.20.6", "2024.05.01")
 
     devFallbackNamespace("intermediary")
   }

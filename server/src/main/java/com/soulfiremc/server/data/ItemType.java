@@ -294,7 +294,7 @@ public record ItemType(
   public static final ItemType STONE_SLAB = register("minecraft:stone_slab");
   public static final ItemType SMOOTH_STONE_SLAB = register("minecraft:smooth_stone_slab");
   public static final ItemType SANDSTONE_SLAB = register("minecraft:sandstone_slab");
-  public static final ItemType CUT_SANDSTONE_SLAB = register("minecraft:cut_sandstone_slab");
+  public static final ItemType CUT_STANDSTONE_SLAB = register("minecraft:cut_sandstone_slab");
   public static final ItemType PETRIFIED_OAK_SLAB = register("minecraft:petrified_oak_slab");
   public static final ItemType COBBLESTONE_SLAB = register("minecraft:cobblestone_slab");
   public static final ItemType BRICK_SLAB = register("minecraft:brick_slab");
@@ -826,6 +826,7 @@ public record ItemType(
   public static final ItemType ARMADILLO_SCUTE = register("minecraft:armadillo_scute");
   public static final ItemType WOLF_ARMOR = register("minecraft:wolf_armor");
   public static final ItemType FLINT_AND_STEEL = register("minecraft:flint_and_steel");
+  public static final ItemType BOWL = register("minecraft:bowl");
   public static final ItemType APPLE = register("minecraft:apple");
   public static final ItemType BOW = register("minecraft:bow");
   public static final ItemType ARROW = register("minecraft:arrow");
@@ -875,7 +876,6 @@ public record ItemType(
   public static final ItemType NETHERITE_AXE = register("minecraft:netherite_axe");
   public static final ItemType NETHERITE_HOE = register("minecraft:netherite_hoe");
   public static final ItemType STICK = register("minecraft:stick");
-  public static final ItemType BOWL = register("minecraft:bowl");
   public static final ItemType MUSHROOM_STEW = register("minecraft:mushroom_stew");
   public static final ItemType STRING = register("minecraft:string");
   public static final ItemType FEATHER = register("minecraft:feather");
@@ -1199,6 +1199,8 @@ public record ItemType(
   public static final ItemType MUSIC_DISC_CAT = register("minecraft:music_disc_cat");
   public static final ItemType MUSIC_DISC_BLOCKS = register("minecraft:music_disc_blocks");
   public static final ItemType MUSIC_DISC_CHIRP = register("minecraft:music_disc_chirp");
+  public static final ItemType MUSIC_DISC_CREATOR = register("minecraft:music_disc_creator");
+  public static final ItemType MUSIC_DISC_CREATOR_MUSIC_BOX = register("minecraft:music_disc_creator_music_box");
   public static final ItemType MUSIC_DISC_FAR = register("minecraft:music_disc_far");
   public static final ItemType MUSIC_DISC_MALL = register("minecraft:music_disc_mall");
   public static final ItemType MUSIC_DISC_MELLOHI = register("minecraft:music_disc_mellohi");
@@ -1211,6 +1213,7 @@ public record ItemType(
   public static final ItemType MUSIC_DISC_RELIC = register("minecraft:music_disc_relic");
   public static final ItemType MUSIC_DISC_5 = register("minecraft:music_disc_5");
   public static final ItemType MUSIC_DISC_PIGSTEP = register("minecraft:music_disc_pigstep");
+  public static final ItemType MUSIC_DISC_PRECIPICE = register("minecraft:music_disc_precipice");
   public static final ItemType DISC_FRAGMENT_5 = register("minecraft:disc_fragment_5");
   public static final ItemType TRIDENT = register("minecraft:trident");
   public static final ItemType PHANTOM_MEMBRANE = register("minecraft:phantom_membrane");
@@ -1361,7 +1364,7 @@ public record ItemType(
 
   public static ItemType register(String key) {
     var instance =
-      GsonDataHelper.fromJson("/minecraft/items.json", key, ItemType.class);
+      GsonDataHelper.fromJson("minecraft/items.json", key, ItemType.class);
 
     return REGISTRY.register(instance);
   }

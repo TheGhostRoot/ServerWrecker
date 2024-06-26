@@ -17,12 +17,29 @@
  */
 package com.soulfiremc.util;
 
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.UnixDomainSocketAddress;
 
 public class SocketAddressHelper {
+  public static final TypeAdapter<SocketAddress> TYPE_ADAPTER =
+    new TypeAdapter<>() {
+      @Override
+      public void write(JsonWriter out, SocketAddress value) throws IOException {
+        out.value(serialize(value));
+      }
+
+      @Override
+      public SocketAddress read(JsonReader in) throws IOException {
+        return deserialize(in.nextString());
+      }
+    };
+
   private SocketAddressHelper() {}
 
   public static String serialize(SocketAddress address) {
@@ -38,12 +55,11 @@ public class SocketAddressHelper {
   public static SocketAddress deserialize(String uriString) {
     var uri = URI.create(uriString);
     if ("inet".equals(uri.getScheme())) {
-      var parts = uri.getSchemeSpecificPart().split(":");
-      var host = parts[0];
-      var port = Integer.parseInt(parts[1]);
+      var host = uri.getHost();
+      var port = uri.getPort();
       return new InetSocketAddress(host, port);
     } else if ("unix".equals(uri.getScheme())) {
-      var path = uri.getSchemeSpecificPart();
+      var path = uri.getPath();
       return UnixDomainSocketAddress.of(path);
     } else {
       throw new IllegalArgumentException("Unsupported scheme: " + uri.getScheme());

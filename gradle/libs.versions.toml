@@ -2,39 +2,40 @@
 log4j = "2.23.1"
 grpc = "1.64.0"
 protobuf = "3.25.3"
-via-version = "5.0.0-20240517.190711-8"
-via-backwards = "5.0.0-20240515.152913-2"
-via-rewind = "4.0.0-20240518.193415-3"
-via-legacy = "3.0.0-20240517.210413-2"
-via-aprilfools = "3.0.0-20240517.172611-2"
-via-loader = "3.0.0-SNAPSHOT"
-via-bedrock = "0.0.8-SNAPSHOT"
+via-version = "5.0.1"
+via-backwards = "5.0.1"
+via-rewind = "4.0.0"
+via-legacy = "3.0.1"
+via-aprilfools = "3.0.0"
+via-loader = "3.0.1"
+via-bedrock = "0.0.9-SNAPSHOT"
+mcprotocollib = "6dfa453"
 flatlaf = "3.4.1"
 flatlaf-inter-version = "4.0"
 flatlaf-jetbrains-mono-version = "2.304"
 kyori = "4.17.0"
 reactor = "1.2.0-SNAPSHOT"
-armeria = "1.28.4"
+armeria = "1.29.0"
 
 [plugins]
 blossom = "net.kyori.blossom:2.1.0"
 protobuf = "com.google.protobuf:0.9.4"
 jmh = "me.champeau.jmh:0.7.2"
-license-report = "com.github.jk1.dependency-license-report:2.7"
+license-report = "com.github.jk1.dependency-license-report:2.8"
 
 [libraries]
 gradle-plugin-shadow = "gradle.plugin.com.github.johnrengelman:shadow:8.0.0"
 gradle-plugin-licenser = "gradle.plugin.org.cadixdev.gradle:licenser:0.6.1"
 gradle-plugin-lombok = "io.freefair.gradle:lombok-plugin:8.6"
 gradle-plugin-indra-git = "net.kyori:indra-git:3.1.3"
-gradle-plugin-unimined = "xyz.wagyourtail.unimined:xyz.wagyourtail.unimined.gradle.plugin:1.2.6"
-checkstyle = "com.puppycrawl.tools:checkstyle:10.16.0"
+gradle-plugin-unimined = "xyz.wagyourtail.unimined:xyz.wagyourtail.unimined.gradle.plugin:1.2.14"
+checkstyle = "com.puppycrawl.tools:checkstyle:10.17.0"
 log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
 log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
 log4j-iostreams = { module = "org.apache.logging.log4j:log4j-iostreams", version.ref = "log4j" }
 log4j-jul = { module = "org.apache.logging.log4j:log4j-jul", version.ref = "log4j" }
-jline = "org.jline:jline-terminal-jansi:3.26.1"
+jline = "org.jline:jline-terminal-jansi:3.26.2"
 jansi = "org.fusesource.jansi:jansi:2.4.1"
 ansi4j-core-api = "com.github.PavelKastornyy.ansi4j:ansi4j-core-api:ansi4j-1.1.0"
 ansi4j-core-impl = "com.github.PavelKastornyy.ansi4j:ansi4j-core-impl:ansi4j-1.1.0"
@@ -52,9 +53,9 @@ flatlaf-fonts-inter = { module = "com.formdev:flatlaf-fonts-inter", version.ref 
 flatlaf-fonts-jetbrains-mono = { module = "com.formdev:flatlaf-fonts-jetbrains-mono", version.ref = "flatlaf-jetbrains-mono-version" }
 xchart = "org.knowm.xchart:xchart:3.8.8"
 miglayout-swing = "com.miglayout:miglayout-swing:11.3"
-mcprotocollib = "com.github.AlexProgrammerDE:MCProtocolLib:0f52621"
-velocity-native = "com.velocitypowered:velocity-native:3.1.2-SNAPSHOT"
-netty-raknet = "org.cloudburstmc.netty:netty-transport-raknet:1.0.0.CR1-SNAPSHOT"
+mcprotocollib = { module = "com.github.AlexProgrammerDE:MCProtocolLib", version.ref = "mcprotocollib" }
+mcstructs = "net.lenni0451.mcstructs:all:2.5.0"
+netty-raknet = "org.cloudburstmc.netty:netty-transport-raknet:1.0.0.CR3-SNAPSHOT"
 via-version = { module = "com.viaversion:viaversion-common", version.ref = "via-version" }
 via-backwards = { module = "com.viaversion:viabackwards-common", version.ref = "via-backwards" }
 via-rewind = { module = "com.viaversion:viarewind-common", version.ref = "via-rewind" }
@@ -66,11 +67,12 @@ snakeyaml = "org.yaml:snakeyaml:2.2"
 kyori-plain = { module = "net.kyori:adventure-text-serializer-plain", version.ref = "kyori" }
 kyori-gson = { module = "net.kyori:adventure-text-serializer-gson", version.ref = "kyori" }
 kyori-ansi = { module = "net.kyori:adventure-text-serializer-ansi", version.ref = "kyori" }
-commons-validator = "commons-validator:commons-validator:1.8.0"
+commons-validator = "commons-validator:commons-validator:1.9.0"
 commons-io = "commons-io:commons-io:2.16.1"
-guava = "com.google.guava:guava:33.2.0-jre"
-gson = "com.google.code.gson:gson:2.10.1"
-pf4j = "org.pf4j:pf4j:3.11.0"
+oshi = "com.github.oshi:oshi-core:6.6.1"
+guava = "com.google.guava:guava:33.2.1-jre"
+gson = "com.google.code.gson:gson:2.11.0"
+pf4j = "org.pf4j:pf4j:3.12.0"
 fastutil = "it.unimi.dsi:fastutil:8.5.13"
 caffeine = "com.github.ben-manes.caffeine:caffeine:3.1.8"
 jetbrains-annotations = "org.jetbrains:annotations:24.1.0"
@@ -88,7 +90,7 @@ grpc-services = { module = "io.grpc:grpc-services", version.ref = "grpc" }
 grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
 grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "grpc" }
 protobuf-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
-netty-bom = "io.netty:netty-bom:4.1.109.Final"
+netty-bom = "io.netty:netty-bom:4.1.111.Final"
 armeria = { module = "com.linecorp.armeria:armeria", version.ref = "armeria" }
 armeria-grpc = { module = "com.linecorp.armeria:armeria-grpc", version.ref = "armeria" }
 armeria-grpc-protocol = { module = "com.linecorp.armeria:armeria-grpc-protocol", version.ref = "armeria" }

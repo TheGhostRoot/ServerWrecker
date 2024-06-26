@@ -17,13 +17,10 @@
  */
 package com.soulfiremc.generator.generators;
 
+import com.soulfiremc.generator.util.FieldGenerationHelper;
 import com.soulfiremc.generator.util.GeneratorConstants;
 import com.soulfiremc.generator.util.ResourceHelper;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.tags.FluidTags;
@@ -34,19 +31,6 @@ import net.minecraft.tags.TagKey;
 public class TagsDataGenerator {
   private TagsDataGenerator() {}
 
-  public static List<ResourceLocation> generateTag(Class<?> tagClass) {
-    var resultArray = new ArrayList<ResourceLocation>();
-    for (var field : tagClass.getDeclaredFields()) {
-      try {
-        var tag = (TagKey<?>) field.get(null);
-        resultArray.add(tag.location());
-      } catch (IllegalAccessException e) {
-        log.error("Failed to generate tag", e);
-      }
-    }
-    return resultArray;
-  }
-
   public static class BlockTagsDataGenerator implements IDataGenerator {
     @Override
     public String getDataName() {
@@ -55,15 +39,12 @@ public class TagsDataGenerator {
 
     @Override
     public String generateDataJson() {
-      var base = ResourceHelper.getResource("/templates/BlockTags.java");
+      var base = ResourceHelper.getResourceAsString("/templates/BlockTags.java");
       return base.replace(
         GeneratorConstants.VALUES_REPLACE,
-        String.join(
-          "\n  ",
-          generateTag(BlockTags.class).stream()
-            .map(
-              s ->
-                "public static final TagKey<BlockType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
+        String.join("\n  ",
+          FieldGenerationHelper.mapFields(BlockTags.class, TagKey.class, TagKey::location)
+            .map(f -> "public static final TagKey<BlockType> %s = register(\"%s\");".formatted(f.name(), f.value()))
             .toArray(String[]::new)));
     }
   }
@@ -76,15 +57,12 @@ public class TagsDataGenerator {
 
     @Override
     public String generateDataJson() {
-      var base = ResourceHelper.getResource("/templates/ItemTags.java");
+      var base = ResourceHelper.getResourceAsString("/templates/ItemTags.java");
       return base.replace(
         GeneratorConstants.VALUES_REPLACE,
-        String.join(
-          "\n  ",
-          generateTag(ItemTags.class).stream()
-            .map(
-              s ->
-                "public static final TagKey<ItemType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
+        String.join("\n  ",
+          FieldGenerationHelper.mapFields(ItemTags.class, TagKey.class, TagKey::location)
+            .map(f -> "public static final TagKey<ItemType> %s = register(\"%s\");".formatted(f.name(), f.value()))
             .toArray(String[]::new)));
     }
   }
@@ -97,15 +75,12 @@ public class TagsDataGenerator {
 
     @Override
     public String generateDataJson() {
-      var base = ResourceHelper.getResource("/templates/EntityTypeTags.java");
+      var base = ResourceHelper.getResourceAsString("/templates/EntityTypeTags.java");
       return base.replace(
         GeneratorConstants.VALUES_REPLACE,
-        String.join(
-          "\n  ",
-          generateTag(EntityTypeTags.class).stream()
-            .map(
-              s ->
-                "public static final TagKey<EntityType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
+        String.join("\n  ",
+          FieldGenerationHelper.mapFields(EntityTypeTags.class, TagKey.class, TagKey::location)
+            .map(f -> "public static final TagKey<EntityType> %s = register(\"%s\");".formatted(f.name(), f.value()))
             .toArray(String[]::new)));
     }
   }
@@ -118,15 +93,12 @@ public class TagsDataGenerator {
 
     @Override
     public String generateDataJson() {
-      var base = ResourceHelper.getResource("/templates/FluidTags.java");
+      var base = ResourceHelper.getResourceAsString("/templates/FluidTags.java");
       return base.replace(
         GeneratorConstants.VALUES_REPLACE,
-        String.join(
-          "\n  ",
-          generateTag(FluidTags.class).stream()
-            .map(
-              s ->
-                "public static final TagKey<FluidType> %s = register(\"%s\", TAGS);".formatted(s.getPath().toUpperCase(Locale.ROOT).replace("/", "_WITH_"), s))
+        String.join("\n  ",
+          FieldGenerationHelper.mapFields(FluidTags.class, TagKey.class, TagKey::location)
+            .map(f -> "public static final TagKey<FluidType> %s = register(\"%s\");".formatted(f.name(), f.value()))
             .toArray(String[]::new)));
     }
   }
