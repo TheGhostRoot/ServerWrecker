@@ -6,6 +6,8 @@ plugins {
 }
 
 dependencies {
+  libs.bundles.bom.get().forEach { api(platform(it)) }
+
   // gRPC
   api(libs.bundles.grpc)
 
@@ -28,6 +30,10 @@ protobuf {
         // Apply the "grpc" plugin whose spec is defined above, without options.
         id("grpc")
       }
+      it.generateDescriptorSet = true
+      it.descriptorSetOptions.includeSourceInfo = true
+      it.descriptorSetOptions.includeImports = true
+      it.descriptorSetOptions.path = layout.buildDirectory.get().file("resources/main/META-INF/armeria/grpc/soulfire.dsc").toString()
     }
   }
 }
