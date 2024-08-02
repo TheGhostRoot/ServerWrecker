@@ -17,7 +17,7 @@
  */
 package com.soulfiremc.server.protocol;
 
-import com.soulfiremc.server.AttackManager;
+import com.soulfiremc.server.InstanceManager;
 import com.soulfiremc.server.api.event.attack.BotConnectionInitEvent;
 import com.soulfiremc.server.protocol.netty.ResolveUtil;
 import com.soulfiremc.server.settings.BotSettings;
@@ -26,18 +26,15 @@ import com.soulfiremc.settings.account.MinecraftAccount;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import io.netty.channel.EventLoopGroup;
-import java.util.UUID;
 import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
 import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
 import org.slf4j.Logger;
 
 public record BotConnectionFactory(
-  AttackManager attackManager,
-  UUID botConnectionId,
+  InstanceManager instanceManager,
   ResolveUtil.ResolvedAddress resolvedAddress,
   SettingsHolder settingsHolder,
   Logger logger,
-  MinecraftProtocol protocol,
   MinecraftAccount minecraftAccount,
   ProtocolVersion protocolVersion,
   SFProxy proxyData,
@@ -47,10 +44,15 @@ public record BotConnectionFactory(
   }
 
   public BotConnection prepareConnectionInternal(ProtocolState targetState) {
+    var protocol = new MinecraftProtocol();
+
+    // Make sure this options is set to false, we have our own listeners
+    protocol.setUseDefaultListeners(false);
+
     var botConnection =
       new BotConnection(
         this,
-        attackManager,
+        instanceManager,
         settingsHolder,
         logger,
         protocol,
@@ -69,7 +71,7 @@ public record BotConnectionFactory(
     session.addListener(new SFBaseListener(botConnection, targetState));
     session.addListener(new SFSessionListener(botConnection));
 
-    attackManager.eventBus().call(new BotConnectionInitEvent(botConnection));
+    instanceManager.eventBus().call(new BotConnectionInitEvent(botConnection));
 
     return botConnection;
   }

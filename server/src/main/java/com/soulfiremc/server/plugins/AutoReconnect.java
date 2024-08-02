@@ -17,10 +17,12 @@
  */
 package com.soulfiremc.server.plugins;
 
+import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.bot.BotDisconnectedEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.settings.lib.SettingsObject;
 import com.soulfiremc.server.settings.property.BooleanProperty;
 import com.soulfiremc.server.settings.property.MinMaxPropertyLink;
@@ -32,27 +34,40 @@ import lombok.NoArgsConstructor;
 import net.lenni0451.lambdaevents.EventHandler;
 
 public class AutoReconnect implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "auto-reconnect",
+    "1.0.0",
+    "Automatically reconnects bots when they time out or are kicked",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
+
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(AutoReconnectSettings.class, "Auto Reconnect");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(AutoReconnectSettings.class, "Auto Reconnect", PLUGIN_INFO);
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(AutoReconnect.class);
-    PluginHelper.registerBotEventConsumer(BotDisconnectedEvent.class, this::onDisconnect);
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(AutoReconnect.class);
+    PluginHelper.registerBotEventConsumer(soulFireServer, BotDisconnectedEvent.class, this::onDisconnect);
   }
 
   public void onDisconnect(BotDisconnectedEvent event) {
     var connection = event.connection();
     var settingsHolder = connection.settingsHolder();
     if (!settingsHolder.get(AutoReconnectSettings.ENABLED)
-      || connection.attackManager().attackState().isInactive()) {
+      || connection.instanceManager().attackState().isInactive()) {
       return;
     }
 
     connection
-      .attackManager()
+      .instanceManager()
       .scheduler()
       .schedule(
         () -> {
@@ -67,7 +82,7 @@ public class AutoReconnect implements InternalPlugin {
           var newConnection = connection.factory().prepareConnection();
 
           connection
-            .attackManager()
+            .instanceManager()
             .botConnections()
             .put(connection.connectionId(), newConnection);
 

@@ -20,9 +20,9 @@ package com.soulfiremc.client.settings;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.gson.JsonElement;
-import com.google.protobuf.Struct;
+import com.google.protobuf.Value;
 import com.google.protobuf.util.JsonFormat;
-import com.soulfiremc.grpc.generated.AttackStartRequest;
+import com.soulfiremc.grpc.generated.InstanceConfig;
 import com.soulfiremc.grpc.generated.SettingsEntry;
 import com.soulfiremc.grpc.generated.SettingsNamespace;
 import com.soulfiremc.settings.ProfileDataStructure;
@@ -108,7 +108,7 @@ public class ClientSettingsManager {
   }
 
   @SneakyThrows
-  public AttackStartRequest exportSettingsProto() {
+  public InstanceConfig exportSettingsProto() {
     var namespaces = new ArrayList<SettingsNamespace>();
 
     for (var namespaceEntry : providers.entrySet()) {
@@ -119,7 +119,7 @@ public class ClientSettingsManager {
         var key = entry.getKey();
         var value = entry.getValue().get();
 
-        var settingsValueBuilder = Struct.newBuilder();
+        var settingsValueBuilder = Value.newBuilder();
         JsonFormat.parser().merge(GsonInstance.GSON.toJson(value), settingsValueBuilder);
         namespaceSettings.add(
           SettingsEntry.newBuilder()
@@ -135,7 +135,7 @@ public class ClientSettingsManager {
           .build());
     }
 
-    return AttackStartRequest.newBuilder()
+    return InstanceConfig.newBuilder()
       .addAllSettings(namespaces)
       .addAllAccounts(
         accountRegistry.accounts().stream()

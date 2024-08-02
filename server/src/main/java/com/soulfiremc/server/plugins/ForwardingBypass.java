@@ -17,13 +17,14 @@
  */
 package com.soulfiremc.server.plugins;
 
-import com.github.steveice10.mc.auth.data.GameProfile;
 import com.google.common.collect.ImmutableList;
+import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.bot.SFPacketReceiveEvent;
 import com.soulfiremc.server.api.event.bot.SFPacketSendingEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.protocol.BotConnection;
 import com.soulfiremc.server.protocol.IdentifiedKey;
 import com.soulfiremc.server.settings.lib.SettingsObject;
@@ -50,6 +51,7 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.lenni0451.lambdaevents.EventHandler;
+import org.geysermc.mcprotocollib.auth.GameProfile;
 import org.geysermc.mcprotocollib.protocol.codec.MinecraftCodecHelper;
 import org.geysermc.mcprotocollib.protocol.packet.handshake.serverbound.ClientIntentionPacket;
 import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundCustomQueryPacket;
@@ -58,6 +60,13 @@ import org.geysermc.mcprotocollib.protocol.packet.login.serverbound.ServerboundC
 @Slf4j
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 public class ForwardingBypass implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "forwarding-bypass",
+    "1.0.0",
+    "Allows bypassing proxy forwarding",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
   private static final char LEGACY_FORWARDING_SEPARATOR = '\0';
 
   public static void writePlayerKey(
@@ -149,15 +158,20 @@ public class ForwardingBypass implements InternalPlugin {
   }
 
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(ForwardingBypassSettings.class, "Forwarding Bypass");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(ForwardingBypassSettings.class, "Forwarding Bypass", PLUGIN_INFO);
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(ForwardingBypass.class);
-    PluginHelper.registerBotEventConsumer(SFPacketSendingEvent.class, this::onPacket);
-    PluginHelper.registerBotEventConsumer(SFPacketReceiveEvent.class, this::onPacketReceive);
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(ForwardingBypass.class);
+    PluginHelper.registerBotEventConsumer(soulFireServer, SFPacketSendingEvent.class, this::onPacket);
+    PluginHelper.registerBotEventConsumer(soulFireServer, SFPacketReceiveEvent.class, this::onPacketReceive);
   }
 
   public void onPacket(SFPacketSendingEvent event) {

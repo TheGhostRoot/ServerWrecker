@@ -18,10 +18,12 @@
 package com.soulfiremc.server.plugins;
 
 import com.soulfiremc.server.ServerCommandManager;
+import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.bot.ChatMessageReceiveEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.brigadier.ServerConsoleCommandSource;
 import com.soulfiremc.server.settings.lib.SettingsObject;
 import com.soulfiremc.server.settings.property.BooleanProperty;
@@ -32,6 +34,14 @@ import lombok.NoArgsConstructor;
 import net.lenni0451.lambdaevents.EventHandler;
 
 public class ChatControl implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "chat-control",
+    "1.0.0",
+    "Control the bot with chat messages",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
+
   public static void onChat(ChatMessageReceiveEvent event) {
     var connection = event.connection();
     var settingsHolder = connection.settingsHolder();
@@ -41,29 +51,37 @@ public class ChatControl implements InternalPlugin {
 
     var plainMessage = event.parseToPlainText();
     var prefix = settingsHolder.get(ChatControlSettings.COMMAND_PREFIX);
-
-    if (plainMessage.startsWith(prefix)) {
-      var command = plainMessage.substring(prefix.length());
-      connection.logger().info("[ChatControl] Executing command: \"{}\"", command);
-      var code = connection.attackManager()
-        .soulFireServer()
-        .injector()
-        .getSingleton(ServerCommandManager.class)
-        .execute(command, ServerConsoleCommandSource.INSTANCE);
-
-      connection.botControl().sendMessage("Command \"%s\" executed! (Code: %d)".formatted(command, code));
+    var prefixIndex = plainMessage.indexOf(prefix);
+    if (prefixIndex == -1) {
+      return;
     }
+
+    plainMessage = plainMessage.substring(prefixIndex);
+    var command = plainMessage.substring(prefix.length());
+    connection.logger().info("[ChatControl] Executing command: \"{}\"", command);
+    var code = connection.instanceManager()
+      .soulFireServer()
+      .injector()
+      .getSingleton(ServerCommandManager.class)
+      .execute(command, ServerConsoleCommandSource.INSTANCE);
+
+    connection.botControl().sendMessage("Command \"%s\" executed! (Code: %d)".formatted(command, code));
   }
 
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(ChatControlSettings.class, "Chat Control");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(ChatControlSettings.class, "Chat Control", PLUGIN_INFO);
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(ChatControl.class);
-    PluginHelper.registerBotEventConsumer(ChatMessageReceiveEvent.class, ChatControl::onChat);
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(ChatControl.class);
+    PluginHelper.registerBotEventConsumer(soulFireServer, ChatMessageReceiveEvent.class, ChatControl::onChat);
   }
 
   @NoArgsConstructor(access = AccessLevel.NONE)

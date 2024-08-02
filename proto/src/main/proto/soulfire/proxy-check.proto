@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option java_package = "com.soulfiremc.grpc.generated";
+option java_multiple_files = true;
+
+package soulfire.v1;
+
+import "soulfire/common.proto";
+
+message ProxyCheckRequest {
+  enum Target {
+    IPIFY = 0;
+    AWS = 1;
+  }
+
+  repeated ProxyProto proxy = 1;
+  Target target = 2;
+}
+
+message ProxyCheckResponseSingle {
+  ProxyProto proxy = 1;
+  bool valid = 2;
+  int32 latency = 3;
+  string realIp = 4;
+}
+
+message ProxyCheckResponse {
+  repeated ProxyCheckResponseSingle response = 1;
+}
+
+service ProxyCheckService {
+  rpc check(ProxyCheckRequest) returns (ProxyCheckResponse);
+}

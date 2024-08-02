@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option java_package = "com.soulfiremc.grpc.generated";
+option java_multiple_files = true;
+
+package soulfire.v1;
+
+message PreviousLogRequest {
+  int32 count = 1;
+}
+
+message PreviousLogResponse {
+  repeated string messages = 1;
+}
+
+message LogRequest {
+}
+
+message LogResponse {
+  string message = 1;
+}
+
+service LogsService {
+  rpc getPrevious(PreviousLogRequest) returns (PreviousLogResponse);
+  rpc subscribe(LogRequest) returns (stream LogResponse);
+}

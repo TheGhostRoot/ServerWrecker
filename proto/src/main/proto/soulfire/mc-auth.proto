@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option java_package = "com.soulfiremc.grpc.generated";
+option java_multiple_files = true;
+
+package soulfire.v1;
+
+import "soulfire/common.proto";
+
+message AuthRequest {
+  MinecraftAccountProto.AccountTypeProto service = 1;
+  optional ProxyProto proxy = 2;
+  string payload = 3;
+}
+
+message AuthResponse {
+  MinecraftAccountProto account = 1;
+}
+
+message RefreshRequest {
+  MinecraftAccountProto account = 1;
+  optional ProxyProto proxy = 2;
+}
+
+message RefreshResponse {
+  MinecraftAccountProto account = 1;
+}
+
+service MCAuthService {
+  rpc login(AuthRequest) returns (AuthResponse);
+  rpc refresh(RefreshRequest) returns (RefreshResponse);
+}

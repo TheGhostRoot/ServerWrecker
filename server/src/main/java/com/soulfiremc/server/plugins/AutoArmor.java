@@ -17,10 +17,12 @@
  */
 package com.soulfiremc.server.plugins;
 
+import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.bot.BotJoinedEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.data.ArmorType;
 import com.soulfiremc.server.protocol.bot.container.InventoryManager;
 import com.soulfiremc.server.settings.lib.SettingsObject;
@@ -35,6 +37,14 @@ import lombok.NoArgsConstructor;
 import net.lenni0451.lambdaevents.EventHandler;
 
 public class AutoArmor implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "auto-armor",
+    "1.0.0",
+    "Automatically puts on the best armor",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
+
   private static void putOn(
     InventoryManager inventoryManager,
     ArmorType armorType) {
@@ -119,14 +129,19 @@ public class AutoArmor implements InternalPlugin {
   }
 
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(AutoArmorSettings.class, "Auto Armor");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(AutoArmorSettings.class, "Auto Armor", PLUGIN_INFO);
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(AutoArmor.class);
-    PluginHelper.registerBotEventConsumer(BotJoinedEvent.class, AutoArmor::onJoined);
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(AutoArmor.class);
+    PluginHelper.registerBotEventConsumer(soulFireServer, BotJoinedEvent.class, AutoArmor::onJoined);
   }
 
   @NoArgsConstructor(access = AccessLevel.NONE)

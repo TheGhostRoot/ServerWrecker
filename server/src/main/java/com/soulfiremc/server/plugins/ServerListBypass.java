@@ -17,10 +17,12 @@
  */
 package com.soulfiremc.server.plugins;
 
+import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.attack.PreBotConnectEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.settings.lib.SettingsObject;
 import com.soulfiremc.server.settings.property.BooleanProperty;
 import com.soulfiremc.server.settings.property.MinMaxPropertyLink;
@@ -34,6 +36,14 @@ import net.lenni0451.lambdaevents.EventHandler;
 import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
 
 public class ServerListBypass implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "server-list-bypass",
+    "1.0.0",
+    "Bypasses server list anti-bots",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
+
   public static void onPreConnect(PreBotConnectEvent event) {
     var connection = event.connection();
     if (connection.targetState() == ProtocolState.STATUS) {
@@ -55,14 +65,20 @@ public class ServerListBypass implements InternalPlugin {
   }
 
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(ServerListBypassSettings.class, "Server List Bypass");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(ServerListBypassSettings.class, "Server List Bypass", PLUGIN_INFO);
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(ServerListBypass.class);
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(ServerListBypass.class);
     PluginHelper.registerAttackEventConsumer(
+      soulFireServer,
       PreBotConnectEvent.class, ServerListBypass::onPreConnect);
   }
 

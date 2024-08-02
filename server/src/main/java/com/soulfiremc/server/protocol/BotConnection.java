@@ -17,8 +17,9 @@
  */
 package com.soulfiremc.server.protocol;
 
-import com.soulfiremc.server.AttackManager;
+import com.soulfiremc.server.InstanceManager;
 import com.soulfiremc.server.SoulFireScheduler;
+import com.soulfiremc.server.api.EventBusOwner;
 import com.soulfiremc.server.api.event.EventExceptionHandler;
 import com.soulfiremc.server.api.event.SoulFireBotEvent;
 import com.soulfiremc.server.api.event.attack.PreBotConnectEvent;
@@ -32,7 +33,7 @@ import com.soulfiremc.server.protocol.netty.ViaClientSession;
 import com.soulfiremc.server.settings.lib.SettingsHolder;
 import com.soulfiremc.server.util.TimeUtil;
 import com.soulfiremc.settings.account.MinecraftAccount;
-import com.soulfiremc.settings.account.service.OnlineSimpleJavaData;
+import com.soulfiremc.settings.account.service.OnlineJavaDataLike;
 import com.soulfiremc.settings.proxy.SFProxy;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import io.netty.channel.EventLoopGroup;
@@ -55,7 +56,7 @@ import org.slf4j.Logger;
 import org.slf4j.MDC;
 
 @Getter
-public final class BotConnection {
+public final class BotConnection implements EventBusOwner<SoulFireBotEvent> {
   public static final ThreadLocal<BotConnection> CURRENT = new ThreadLocal<>();
   private final UUID connectionId = UUID.randomUUID();
   private final LambdaManager eventBus = LambdaManager.basic(new ASMGenerator())
@@ -73,7 +74,7 @@ public final class BotConnection {
   private final Queue<Runnable> preTickHooks = new ConcurrentLinkedQueue<>();
   private final SoulFireScheduler scheduler;
   private final BotConnectionFactory factory;
-  private final AttackManager attackManager;
+  private final InstanceManager instanceManager;
   private final SettingsHolder settingsHolder;
   private final Logger logger;
   private final MinecraftProtocol protocol;
@@ -92,7 +93,7 @@ public final class BotConnection {
 
   public BotConnection(
     BotConnectionFactory factory,
-    AttackManager attackManager,
+    InstanceManager instanceManager,
     SettingsHolder settingsHolder,
     Logger logger,
     MinecraftProtocol protocol,
@@ -103,7 +104,7 @@ public final class BotConnection {
     SFProxy proxyData,
     EventLoopGroup eventLoopGroup) {
     this.factory = factory;
-    this.attackManager = attackManager;
+    this.instanceManager = instanceManager;
     this.settingsHolder = settingsHolder;
     this.logger = logger;
     this.scheduler = new SoulFireScheduler(logger, runnable -> () -> {
@@ -137,7 +138,7 @@ public final class BotConnection {
   public CompletableFuture<?> connect() {
     return CompletableFuture.runAsync(
       () -> {
-        attackManager.eventBus().call(new PreBotConnectEvent(this));
+        instanceManager.eventBus().call(new PreBotConnectEvent(this));
         session.connect(true);
       });
   }
@@ -244,7 +245,7 @@ public final class BotConnection {
 
   public void joinServerId(String serverId, ViaClientSession session) {
     try {
-      var javaData = (OnlineSimpleJavaData) minecraftAccount.accountData();
+      var javaData = (OnlineJavaDataLike) minecraftAccount.accountData();
       sessionService.joinServer(accountProfileId, javaData.authToken(), serverId);
       session.logger().debug("Successfully sent mojang join request!");
     } catch (Exception e) {

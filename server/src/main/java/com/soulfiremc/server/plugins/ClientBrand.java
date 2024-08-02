@@ -17,10 +17,12 @@
  */
 package com.soulfiremc.server.plugins;
 
+import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.bot.SFPacketReceiveEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.protocol.SFProtocolConstants;
 import com.soulfiremc.server.settings.lib.SettingsObject;
 import com.soulfiremc.server.settings.property.BooleanProperty;
@@ -35,6 +37,14 @@ import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.Serverbound
 import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundGameProfilePacket;
 
 public class ClientBrand implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "client-brand",
+    "1.0.0",
+    "Sends the client brand to the server",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
+
   public static void onPacket(SFPacketReceiveEvent event) {
     if (event.packet() instanceof ClientboundGameProfilePacket) {
       var connection = event.connection();
@@ -57,14 +67,19 @@ public class ClientBrand implements InternalPlugin {
   }
 
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(ClientBrandSettings.class, "Client Brand");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(ClientBrandSettings.class, "Client Brand", PLUGIN_INFO);
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(ClientBrand.class);
-    PluginHelper.registerBotEventConsumer(SFPacketReceiveEvent.class, ClientBrand::onPacket);
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(ClientBrand.class);
+    PluginHelper.registerBotEventConsumer(soulFireServer, SFPacketReceiveEvent.class, ClientBrand::onPacket);
   }
 
   @NoArgsConstructor(access = AccessLevel.PRIVATE)

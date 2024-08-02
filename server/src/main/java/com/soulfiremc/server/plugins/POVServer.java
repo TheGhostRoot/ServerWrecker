@@ -17,16 +17,16 @@
  */
 package com.soulfiremc.server.plugins;
 
-import com.github.steveice10.mc.auth.data.GameProfile;
-import com.soulfiremc.server.AttackManager;
+import com.soulfiremc.server.InstanceManager;
 import com.soulfiremc.server.ServerCommandManager;
 import com.soulfiremc.server.SoulFireServer;
+import com.soulfiremc.server.api.InternalPlugin;
 import com.soulfiremc.server.api.PluginHelper;
-import com.soulfiremc.server.api.SoulFireAPI;
+import com.soulfiremc.server.api.PluginInfo;
 import com.soulfiremc.server.api.event.EventUtil;
 import com.soulfiremc.server.api.event.attack.AttackEndedEvent;
-import com.soulfiremc.server.api.event.attack.AttackInitEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.attack.AttackStartEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
 import com.soulfiremc.server.protocol.BotConnection;
 import com.soulfiremc.server.protocol.SFProtocolConstants;
 import com.soulfiremc.server.protocol.SFProtocolHelper;
@@ -72,6 +72,7 @@ import net.kyori.adventure.util.TriState;
 import net.lenni0451.lambdaevents.EventHandler;
 import org.cloudburstmc.math.vector.Vector3i;
 import org.cloudburstmc.nbt.NbtMap;
+import org.geysermc.mcprotocollib.auth.GameProfile;
 import org.geysermc.mcprotocollib.network.Session;
 import org.geysermc.mcprotocollib.network.event.server.ServerAdapter;
 import org.geysermc.mcprotocollib.network.event.server.ServerClosedEvent;
@@ -158,6 +159,13 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.Serv
 
 @Slf4j
 public class POVServer implements InternalPlugin {
+  public static final PluginInfo PLUGIN_INFO = new PluginInfo(
+    "pov-server",
+    "1.0.0",
+    "A plugin that allows users to control bots from a first-person perspective.",
+    "AlexProgrammerDE",
+    "GPL-3.0"
+  );
   private static final List<Class<?>> NOT_SYNCED =
     List.of(
       ClientboundKeepAlivePacket.class,
@@ -174,31 +182,31 @@ public class POVServer implements InternalPlugin {
   }
 
   @EventHandler
-  public static void onSettingsRegistryInit(SettingsRegistryInitEvent event) {
-    event.settingsRegistry().addClass(POVServerSettings.class, "POV Server");
+  public static void onSettingsRegistryInit(InstanceSettingsRegistryInitEvent event) {
+    event.settingsRegistry().addClass(POVServerSettings.class, "POV Server", PLUGIN_INFO);
   }
 
   private static GameProfile getFakePlayerListEntry(Component text) {
     return new GameProfile(UUID.randomUUID(), LegacyComponentSerializer.legacySection().serialize(text));
   }
 
-  private static TcpServer startPOVServer(SettingsHolder settingsHolder, int port, AttackManager attackManager) {
+  private static TcpServer startPOVServer(SettingsHolder settingsHolder, int port, InstanceManager instanceManager) {
     var faviconBytes = ResourceHelper.getResourceAsBytes("assets/pov_favicon.png");
     var server = new TcpServer("0.0.0.0", port, MinecraftProtocol::new);
 
     server.setGlobalFlag(MinecraftConstants.VERIFY_USERS_KEY, false);
     server.setGlobalFlag(MinecraftConstants.SERVER_INFO_BUILDER_KEY, session -> new ServerStatusInfo(
-      new VersionInfo(
-        MinecraftCodec.CODEC.getMinecraftVersion(),
-        MinecraftCodec.CODEC.getProtocolVersion()),
-      new PlayerInfo(settingsHolder.get(BotSettings.AMOUNT), attackManager.botConnections().size(), List.of(
+      Component.text("Attack POV server for attack %s!".formatted(instanceManager.id()))
+        .color(NamedTextColor.GREEN)
+        .decorate(TextDecoration.BOLD),
+      new PlayerInfo(settingsHolder.get(BotSettings.AMOUNT), instanceManager.botConnections().size(), List.of(
         getFakePlayerListEntry(Component.text("Observe and control bots!").color(NamedTextColor.GREEN)),
         getFakePlayerListEntry(Component.text("Play the server through the bots.").color(NamedTextColor.GREEN)),
         getFakePlayerListEntry(Component.text("Still experimental!").color(NamedTextColor.RED))
       )),
-      Component.text("Attack POV server for attack %d!".formatted(attackManager.id()))
-        .color(NamedTextColor.GREEN)
-        .decorate(TextDecoration.BOLD),
+      new VersionInfo(
+        MinecraftCodec.CODEC.getMinecraftVersion(),
+        MinecraftCodec.CODEC.getProtocolVersion()),
       faviconBytes,
       false));
 
@@ -341,7 +349,7 @@ public class POVServer implements InternalPlugin {
                     log.info("{}: {}", profile.getName(), selectedName);
 
                     var first =
-                      attackManager.botConnections().values().stream()
+                      instanceManager.botConnections().values().stream()
                         .filter(c -> c.accountName().equals(selectedName))
                         .findFirst();
                     if (first.isEmpty()) {
@@ -489,7 +497,7 @@ public class POVServer implements InternalPlugin {
                           if (message.startsWith(prefix)) {
                             var command = message.substring(prefix.length());
                             var source = new PovServerUser(session, session.getFlag(MinecraftConstants.PROFILE_KEY).getName());
-                            var code = attackManager
+                            var code = instanceManager
                               .soulFireServer()
                               .injector()
                               .getSingleton(ServerCommandManager.class)
@@ -568,8 +576,8 @@ public class POVServer implements InternalPlugin {
                 Objects.requireNonNull(botConnection);
                 var dataManager = botConnection.dataManager();
 
-                session.send(new ClientboundStartConfigurationPacket());
-                session.switchOutboundProtocol(() -> ((MinecraftProtocol) session.getPacketProtocol()).setOutboundState(ProtocolState.CONFIGURATION));
+                session.send(new ClientboundStartConfigurationPacket(), () ->
+                  ((MinecraftProtocol) session.getPacketProtocol()).setOutboundState(ProtocolState.CONFIGURATION));
                 awaitReceived(ServerboundConfigurationAcknowledgedPacket.class);
 
                 if (dataManager.serverEnabledFeatures() != null) {
@@ -966,12 +974,18 @@ public class POVServer implements InternalPlugin {
   }
 
   @Override
-  public void onLoad() {
-    SoulFireAPI.registerListeners(POVServer.class);
-    SoulFireAPI.registerListener(
-      AttackInitEvent.class,
+  public PluginInfo pluginInfo() {
+    return PLUGIN_INFO;
+  }
+
+  @Override
+  public void onServer(SoulFireServer soulFireServer) {
+    soulFireServer.registerListeners(POVServer.class);
+    PluginHelper.registerAttackEventConsumer(
+      soulFireServer,
+      AttackStartEvent.class,
       event -> {
-        var attackManager = event.attackManager();
+        var attackManager = event.instanceManager();
         var settingsHolder = attackManager.settingsHolder();
         if (!settingsHolder.get(POVServerSettings.ENABLED)) {
           return;

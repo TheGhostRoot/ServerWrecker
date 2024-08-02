@@ -20,31 +20,16 @@ package com.soulfiremc.server;
 import ch.jalu.injector.Injector;
 import ch.jalu.injector.InjectorBuilder;
 import com.soulfiremc.builddata.BuildData;
-import com.soulfiremc.server.api.AttackState;
-import com.soulfiremc.server.api.ServerPlugin;
+import com.soulfiremc.grpc.generated.SettingsPage;
+import com.soulfiremc.server.api.EventBusOwner;
 import com.soulfiremc.server.api.SoulFireAPI;
-import com.soulfiremc.server.api.event.attack.AttackInitEvent;
-import com.soulfiremc.server.api.event.lifecycle.SettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.EventExceptionHandler;
+import com.soulfiremc.server.api.event.SoulFireGlobalEvent;
+import com.soulfiremc.server.api.event.attack.InstanceInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.InstanceSettingsRegistryInitEvent;
+import com.soulfiremc.server.api.event.lifecycle.ServerSettingsRegistryInitEvent;
 import com.soulfiremc.server.data.TranslationMapper;
 import com.soulfiremc.server.grpc.RPCServer;
-import com.soulfiremc.server.plugins.AutoArmor;
-import com.soulfiremc.server.plugins.AutoEat;
-import com.soulfiremc.server.plugins.AutoJump;
-import com.soulfiremc.server.plugins.AutoReconnect;
-import com.soulfiremc.server.plugins.AutoRegister;
-import com.soulfiremc.server.plugins.AutoRespawn;
-import com.soulfiremc.server.plugins.AutoTotem;
-import com.soulfiremc.server.plugins.ChatControl;
-import com.soulfiremc.server.plugins.ChatMessageLogger;
-import com.soulfiremc.server.plugins.ClientBrand;
-import com.soulfiremc.server.plugins.ClientSettings;
-import com.soulfiremc.server.plugins.FakeVirtualHost;
-import com.soulfiremc.server.plugins.ForwardingBypass;
-import com.soulfiremc.server.plugins.InternalPlugin;
-import com.soulfiremc.server.plugins.KillAura;
-import com.soulfiremc.server.plugins.ModLoaderSupport;
-import com.soulfiremc.server.plugins.POVServer;
-import com.soulfiremc.server.plugins.ServerListBypass;
 import com.soulfiremc.server.settings.AccountSettings;
 import com.soulfiremc.server.settings.BotSettings;
 import com.soulfiremc.server.settings.DevSettings;
@@ -62,28 +47,24 @@ import com.soulfiremc.server.viaversion.platform.SFViaLegacy;
 import com.soulfiremc.server.viaversion.platform.SFViaPlatform;
 import com.soulfiremc.server.viaversion.platform.SFViaRewind;
 import com.soulfiremc.util.KeyHelper;
-import com.soulfiremc.util.SFFeatureFlags;
 import com.soulfiremc.util.SFPathConstants;
 import com.soulfiremc.util.ShutdownManager;
 import com.viaversion.viaversion.ViaManagerImpl;
 import com.viaversion.viaversion.api.Via;
 import com.viaversion.viaversion.protocol.ProtocolManagerImpl;
 import io.jsonwebtoken.Jwts;
-import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.crypto.SecretKey;
 import lombok.Getter;
@@ -91,13 +72,15 @@ import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.flattener.ComponentFlattener;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.lenni0451.lambdaevents.LambdaManager;
+import net.lenni0451.lambdaevents.generator.ASMGenerator;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.pf4j.PluginManager;
 
 @Slf4j
 @Getter
-public class SoulFireServer {
+public class SoulFireServer implements EventBusOwner<SoulFireGlobalEvent> {
   public static final ComponentFlattener FLATTENER =
     ComponentFlattener.basic().toBuilder()
       .mapper(TranslatableComponent.class, TranslationMapper.INSTANCE)
@@ -107,17 +90,27 @@ public class SoulFireServer {
 
   private final Injector injector =
     new InjectorBuilder().addDefaultHandlers("com.soulfiremc").create();
-  @Getter
-  private final ExecutorService threadPool = Executors.newCachedThreadPool();
+  private final SoulFireScheduler scheduler = new SoulFireScheduler(log);
   private final Map<String, String> serviceServerConfig = new HashMap<>();
-  private final Int2ObjectMap<AttackManager> attacks =
-    Int2ObjectMaps.synchronize(new Int2ObjectArrayMap<>());
+  private final Map<UUID, InstanceManager> instances = Collections.synchronizedMap(new HashMap<>());
   private final RPCServer rpcServer;
-  private final ServerSettingsRegistry settingsRegistry;
+  private final ServerSettingsRegistry serverSettingsRegistry;
+  private final ServerSettingsRegistry instanceSettingsRegistry;
   private final SecretKey jwtSecretKey;
   private final PluginManager pluginManager;
   private final ShutdownManager shutdownManager;
   private final Path baseDirectory;
+  private final LambdaManager eventBus =
+    LambdaManager.basic(new ASMGenerator())
+      .setExceptionHandler(EventExceptionHandler.INSTANCE)
+      .setEventFilter(
+        (c, h) -> {
+          if (SoulFireGlobalEvent.class.isAssignableFrom(c)) {
+            return true;
+          } else {
+            throw new IllegalStateException("This event handler only accepts global events");
+          }
+        });
 
   public SoulFireServer(
     String host,
@@ -132,9 +125,6 @@ public class SoulFireServer {
 
     // Register into injector
     injector.register(SoulFireServer.class, this);
-
-    // Init API
-    SoulFireAPI.setSoulFire(this);
 
     injector.register(ShutdownManager.class, shutdownManager);
 
@@ -217,58 +207,26 @@ public class SoulFireServer {
       log.info("SoulFire is up to date!");
     }
 
-    registerInternalServerExtensions();
-    registerServerExtensions();
-
     for (var serverExtension : SoulFireAPI.getServerExtensions()) {
-      serverExtension.onEnable(this);
+      serverExtension.onServer(this);
     }
 
-    SoulFireAPI.postEvent(
-      new SettingsRegistryInitEvent(
-        settingsRegistry =
-          new ServerSettingsRegistry()
+    eventBus.call(
+      new ServerSettingsRegistryInitEvent(
+        serverSettingsRegistry =
+          new ServerSettingsRegistry(SettingsPage.Type.SERVER)
+            .addClass(DevSettings.class, "Dev Settings")));
+    eventBus.call(
+      new InstanceSettingsRegistryInitEvent(
+        instanceSettingsRegistry =
+          new ServerSettingsRegistry(SettingsPage.Type.INSTANCE)
             // Needs Via loaded to have all protocol versions
-            .addClass(BotSettings.class, "Bot Settings", true)
-            .addClass(DevSettings.class, "Dev Settings", true)
-            .addClass(AccountSettings.class, "Account Settings", true)
-            .addClass(ProxySettings.class, "Proxy Settings", true)));
+            .addClass(BotSettings.class, "Bot Settings")
+            .addClass(AccountSettings.class, "Account Settings")
+            .addClass(ProxySettings.class, "Proxy Settings")));
 
     log.info(
       "Finished loading! (Took {}ms)", Duration.between(startTime, Instant.now()).toMillis());
-  }
-
-  private static void registerInternalServerExtensions() {
-    var plugins =
-      new InternalPlugin[] {
-        new ClientBrand(),
-        new ClientSettings(),
-        new ChatControl(),
-        new AutoReconnect(),
-        new AutoRegister(),
-        new AutoRespawn(),
-        new AutoTotem(),
-        new AutoJump(),
-        new AutoArmor(),
-        new AutoEat(),
-        new ChatMessageLogger(),
-        new ServerListBypass(),
-        new FakeVirtualHost(), // Needs to be before ModLoaderSupport to not break it
-        SFFeatureFlags.MOD_SUPPORT
-          ? new ModLoaderSupport()
-          : null, // Needs to be before ForwardingBypass to not break it
-        new ForwardingBypass(),
-        new KillAura(),
-        new POVServer()
-      };
-
-    for (var plugin : plugins) {
-      if (plugin == null) {
-        continue;
-      }
-
-      SoulFireAPI.registerServerExtension(plugin);
-    }
   }
 
   public static void setupLoggingAndVia(SettingsHolder settingsHolder) {
@@ -283,10 +241,6 @@ public class SoulFireServer {
     Configurator.setRootLevel(level);
     Configurator.setLevel("io.netty", nettyLevel);
     Configurator.setLevel("io.grpc", grpcLevel);
-  }
-
-  private void registerServerExtensions() {
-    pluginManager.getExtensions(ServerPlugin.class).forEach(SoulFireAPI::registerServerExtension);
   }
 
   public String generateRemoteUserJWT() {
@@ -307,10 +261,10 @@ public class SoulFireServer {
 
   private void shutdownHook() {
     // Shutdown the attacks if there is any
-    stopAllAttacks().join();
+    stopAllAttacksSessions().join();
 
     // Shutdown scheduled tasks
-    threadPool.shutdown();
+    scheduler.shutdown();
 
     // Shut down RPC
     try {
@@ -320,31 +274,33 @@ public class SoulFireServer {
     }
   }
 
-  public int startAttack(SettingsHolder settingsHolder) {
-    var attackManager = new AttackManager(this, settingsHolder);
-    SoulFireAPI.postEvent(new AttackInitEvent(attackManager));
+  public UUID createInstance(String friendlyName) {
+    var attackManager = new InstanceManager(UUID.randomUUID(), friendlyName, this, SettingsHolder.EMPTY);
+    eventBus.call(new InstanceInitEvent(attackManager));
 
-    attacks.put(attackManager.id(), attackManager);
+    instances.put(attackManager.id(), attackManager);
 
-    attackManager.start();
-
-    log.debug("Started attack with id {}", attackManager.id());
+    log.debug("Created instance with id {}", attackManager.id());
 
     return attackManager.id();
   }
 
-  public void toggleAttackState(int id, boolean pause) {
-    attacks.get(id).attackState(pause ? AttackState.PAUSED : AttackState.RUNNING);
-  }
-
-  public CompletableFuture<?> stopAllAttacks() {
+  public CompletableFuture<?> stopAllAttacksSessions() {
     return CompletableFuture.allOf(
-      Set.copyOf(attacks.keySet()).stream()
-        .map(this::stopAttack)
+      Set.copyOf(instances.values()).stream()
+        .map(InstanceManager::stopAttackSession)
         .toArray(CompletableFuture[]::new));
   }
 
-  public CompletableFuture<?> stopAttack(int id) {
-    return attacks.remove(id).stop();
+  public CompletableFuture<?> stopAttack(UUID id) {
+    return instances.get(id).stopAttackPermanently();
+  }
+
+  public CompletableFuture<?> deleteInstance(UUID id) {
+    return instances.remove(id).stopAttackPermanently();
+  }
+
+  public InstanceManager getInstance(UUID id) {
+    return instances.get(id);
   }
 }
